@@ -6,7 +6,7 @@ El servidor conserva trabajos, fechas, resultados, cuotas y leases en D1. El nav
 
 La programación anterior de ChatGPT permanece pausada durante la preparación del reemplazo. El supervisor separado está archivado por el cupo de tareas de ChatGPT. No hay supervisión recíproca activa ni debe reactivarse automáticamente durante esta transición.
 
-El nuevo workflow de GitHub está preparado para los minutos 7, 22, 37 y 52 de cada hora UTC. Necesita dos secretos, la variable AGENT_RUNNER_ENABLED y una certificación real antes de declararse operativo. Conserva el mismo servidor, base, cuotas y controles; no agrega agentes ni servicios de pago. Ver [runner-package/README.md](runner-package/README.md).
+El nuevo workflow de GitHub está preparado para los minutos 7, 22, 37 y 52 de cada hora UTC. Tiene sus dos secretos configurados y AGENT_RUNNER_ENABLED=true. Se comprobó la conexión mediante una ejecución manual real; quedan pendientes la observación del primer evento programado y un trabajo con resultado por esta ruta. Conserva el mismo servidor, base, cuotas y controles; no agrega agentes ni servicios de pago. Ver [runner-package/README.md](runner-package/README.md).
 
 ## Recibos y límites de la evidencia
 
@@ -56,4 +56,14 @@ Los avisos de entrega, bloqueo e interrupción están persistidos y disponibles 
 
 Validación local: 37 pruebas del servidor con SQL real y 7 del ejecutor con HTTP simulado. Cubren contexto válido/inválido, pausa, identidad del ciclo, privacidad del recibo, límite de fases/llamadas, destino fijo, fechas y presupuesto de tiempo. El build y el artefacto ESM se validaron. Estas pruebas no certifican un workflow real.
 
-Pendiente: autorizar y guardar los dos secretos de Actions, habilitar la variable y cruzar una ejecución real con su recibo. No declarar recuperación independiente ni avisos push certificados. Los avisos del MVP se guardan en su bandeja; no se acredita lectura humana.
+Configuración autorizada y realizada: ambos secretos de Actions y variable AGENT_RUNNER_ENABLED=true. Se cruzó la ejecución manual 40144699221 con su recibo en el Site. No declarar recuperación independiente ni avisos push certificados. Los avisos del MVP se guardan en su bandeja; no se acredita lectura humana.
+
+## Activación autorizada y conexión comprobada
+
+Rick autorizó guardar las dos credenciales y habilitar el ejecutor. Los valores no se conservan en este repositorio. La clave limitada se actualizó en Sites y se aplicó mediante el despliegue appgdep_6add4526ed608191b732084a1b2f62ee de la versión 20, revisión de entorno 4.
+
+GitHub: https://github.com/Rick2818/Fabrica-de-Agentes-IA/actions/runs/40144699221 . Evento workflow_dispatch, intento 1, commit 78d2ada618d16dc9032a848e366851b86e8aca21. Inicio 2026-10-24T23:55:56Z, conclusión success. El paso de procesamiento terminó a las 23:56:04Z.
+
+Recibo del Site: source github-actions, run_id 40144699221, intento 1, mismo commit y evento; started_at 1792886163663, completed_at 1792886164506, status idle y pending 0. El consumo de IA siguió en 17/20: no se llamó al modelo durante esta prueba. El tablero apunta a github:1432658222 y conserva enabled=true.
+
+Al registrar esta evidencia, el primer evento schedule y una entrega procesada por GitHub todavía no están comprobados. La prueba manual acredita autenticación, acceso al endpoint y lectura de la cola; no una entrega de IA ni disponibilidad indefinida. Los disparadores antiguos de ChatGPT y el supervisor permanecen pausados.

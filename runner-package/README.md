@@ -14,8 +14,10 @@ Cada ciclo procesa como máximo ocho fases o dieciséis llamadas en cuatro minut
 
 `POST /internal/runner` exige la credencial de servicio validada por Sites y la clave limitada del runtime. El contexto permitido contiene el repositorio, run_id, intento, evento y commit; el servidor guarda estos datos con el recibo. No devuelve notas, mensajes ni entregas. El contexto declarado debe contrastarse con los registros reales de GitHub; no acredita por sí solo su procedencia.
 
-## Certificación pendiente
+## Evidencia y certificación pendiente
 
 Comprobar un Run workflow real y un evento schedule real, sus recibos y resultados persistidos. Un resultado idle solo demuestra conexión y cola vacía. Utilizar datos sintéticos y revisar el contexto enviado al proveedor; no usar información personal o confidencial mientras esté pendiente la revisión de privacidad. No retirar el mecanismo anterior hasta certificar el reemplazo.
 
 GitHub puede retrasar u omitir eventos programados y deshabilitar la programación de repositorios públicos tras sesenta días sin actividad. Estas restricciones impiden prometer disponibilidad continua. Fuentes oficiales: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows y https://docs.github.com/en/actions/concepts/billing-and-usage .
+
+Activación autorizada: secretos configurados y AGENT_RUNNER_ENABLED=true. Conexión manual comprobada en run 40144699221 (success, idle, pending 0); recibo coincidente en el Site. El primer schedule y una entrega procesada por GitHub siguen pendientes de evidencia.
