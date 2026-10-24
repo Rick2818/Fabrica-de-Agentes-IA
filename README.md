@@ -41,4 +41,6 @@ Repositorio del proyecto: https://github.com/Rick2818/Agentes-Ricardo . Creado p
 
 ## Continuidad y avisos
 
-La bandeja de avisos conserva entregas, bloqueos y acuses de lectura. El ejecutor y un supervisor independientes del navegador registran ciclos y comprueban interrupciones. Abrir la página ya no ejecuta la cola automáticamente. Consultar [CONTINUIDAD.md](CONTINUIDAD.md) para controles, evidencia y límites. La validación local consta de 34 pruebas; la comprobación de ciclos reales permanece documentada por separado.
+La bandeja de avisos conserva entregas, bloqueos y acuses de lectura. El ejecutor y un supervisor independientes del navegador registran ciclos y comprueban interrupciones. Abrir la página ya no ejecuta la cola automáticamente. Consultar [CONTINUIDAD.md](CONTINUIDAD.md) para controles, evidencia y límites. La validación local consta de 35 pruebas; la comprobación de ciclos reales permanece documentada por separado.
+
+Estado operativo: el ejecutor de ChatGPT quedó activo; el supervisor separado se archivó por el cupo de tareas de ChatGPT. Esto no limita la creación de workflows de GitHub Actions. El runner de GitHub sigue preparado y sin activar. Ver CONTINUIDAD.md para la evidencia y el límite pendiente.

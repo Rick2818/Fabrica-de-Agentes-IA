@@ -64,21 +64,24 @@ export async function continuity(db,now=Date.now()){
  const cycles=await rows(db,'SELECT * FROM agent_cycles ORDER BY started_at DESC,id DESC LIMIT 40');
  const latest=cycles.find(c=>c.source==='scheduled'&&c.completed_at);
  const raw=await first(db,"SELECT value FROM settings WHERE key='scheduler_check'");
- let check=null;try{check=JSON.parse(raw?.value||'null')}catch{}
+ const watcher=await first(db,"SELECT value FROM settings WHERE key='watchdog_check'");
+ let check=null,watchdog=null;try{check=JSON.parse(raw?.value||'null');watchdog=JSON.parse(watcher?.value||'null')}catch{}
  const active=await first(db,"SELECT count(*) AS n,MIN(CASE WHEN status='running' THEN lease_until ELSE next_attempt_at END) AS due FROM jobs WHERE status IN ('queued','waiting','running')");
  const configuration=await first(db,"SELECT value FROM settings WHERE key='automation'");let enabled=false;try{enabled=JSON.parse(configuration?.value||'null')?.enabled===true}catch{}
  const stale=!latest||now-latest.completed_at>90*60000;
  const observedDisabled=check&&now-check.checked_at<90*60000&&!check.is_enabled;
- const attention=check&&now-check.checked_at<90*60000&&(check.requires_user_action||check.status==='failed');
+ const attention=(check&&now-check.checked_at<90*60000&&(check.requires_user_action||check.status==='failed'))||(watchdog&&now-watchdog.checked_at<90*60000&&(!watchdog.is_enabled||watchdog.requires_user_action||watchdog.status==='failed'));
  const status=!enabled&&configuration?'paused':observedDisabled?'stopped':attention?'attention':latest&&!stale?'recent':enabled?'unverified':'unconfigured';
  const stalled=active.n>0&&active.due!=null&&now-active.due>90*60000&&stale;
- return {status,last_scheduled_cycle:latest||null,cycles,scheduler_check:check,stalled,pending:active.n,oldest_due:active.due||null};
+ return {status,last_scheduled_cycle:latest||null,cycles,scheduler_check:check,watchdog_check:watchdog,stalled,pending:active.n,oldest_due:active.due||null};
 }
 export async function recordSchedulerCheck(db,a,now=Date.now()){
  if(!text(a.schedule_id,200)||typeof a.is_enabled!=='boolean'||typeof a.requires_user_action!=='boolean'||!['completed','in_progress','failed','no_update','unknown'].includes(a.status)||!(a.run_id==null||text(a.run_id,200)))throw Object.assign(Error('Comprobación inválida.'),{status:400});
  for(const key of ['started_at','completed_at'])if(a[key]!=null&&(!Number.isSafeInteger(a[key])||a[key]<0||a[key]>now+300000))throw Object.assign(Error('Fecha de comprobación inválida.'),{status:400});
  const value={schedule_id:a.schedule_id,is_enabled:a.is_enabled,requires_user_action:a.requires_user_action,status:a.status,run_id:a.run_id||null,started_at:a.started_at||null,completed_at:a.completed_at||null,checked_at:now};
- await stmt(db,"INSERT INTO settings(key,value) VALUES('scheduler_check',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify(value)).run();
+ const config=await first(db,"SELECT value FROM settings WHERE key='automation'");let primary=null;try{primary=JSON.parse(config?.value||'null')?.id}catch{}
+ const settingKey=primary&&primary!==a.schedule_id?'watchdog_check':'scheduler_check';
+ await stmt(db,"INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",settingKey,JSON.stringify(value)).run();
  const h=await continuity(db,now);
  const problem=!a.is_enabled||a.requires_user_action||a.status==='failed'||h.stalled;
  if(problem){
@@ -285,7 +288,7 @@ const toolList=[
  {name:'send_message',description:'Conversar con Agente Ricardo y guardar el intercambio. Reutilizar id para evitar duplicados.',inputSchema:{type:'object',properties:{id:{type:'string'},message:{type:'string'}},required:['id','message']}},
  {name:'create_task',description:'Guardar un encargo real y ejecutar el primer trabajo disponible. Reutilizar id para reintentos sin duplicar.',inputSchema:{type:'object',properties:{id:{type:'string'},title:{type:'string'},prompt:{type:'string'},due_at:{type:'integer'}},required:['id','title','prompt']}},
  {name:'save_note',description:'Guardar o actualizar una preferencia por su título en la memoria real de Agente Ricardo.',inputSchema:{type:'object',properties:{title:{type:'string'},content:{type:'string'}},required:['title','content']}},
- {name:'register_cloud_schedule',description:'Registrar en el tablero la programación en la nube, únicamente después de crearla o verificarla con Sites. No crea ni activa una tarea programada por sí misma.',inputSchema:{type:'object',properties:{id:{type:'string'},schedule:{type:'string'},enabled:{type:'boolean'},check:{type:'object',properties:{is_enabled:{type:'boolean'},requires_user_action:{type:'boolean'},status:{type:'string'},run_id:{type:'string'},started_at:{type:'integer'},completed_at:{type:'integer'}}}},required:['id','schedule','enabled']}}
+ {name:'register_cloud_schedule',description:'Registrar en el tablero la programación en la nube, únicamente después de crearla o verificarla con Sites. No crea ni activa una tarea programada por sí misma.',inputSchema:{type:'object',properties:{id:{type:'string'},schedule:{type:'string'},enabled:{type:'boolean'},check:{type:'object',properties:{schedule_id:{type:'string'},is_enabled:{type:'boolean'},requires_user_action:{type:'boolean'},status:{type:'string'},run_id:{type:'string'},started_at:{type:'integer'},completed_at:{type:'integer'}}}},required:['id','schedule','enabled']}}
 ];
 async function mcp(request,env){
  const input=await parse(request);let result;
@@ -319,7 +322,7 @@ async function mcp(request,env){
   }
   else if(input.params?.name==='register_cloud_schedule'){
    const a=input.params.arguments||{};if(!text(a.id,200)||!text(a.schedule,200)||typeof a.enabled!=='boolean')throw Object.assign(Error('Programación inválida'),{status:400});
-   if(a.check)await recordSchedulerCheck(env.DB,{...a.check,schedule_id:a.id});
+   if(a.check)await recordSchedulerCheck(env.DB,{...a.check,schedule_id:a.check.schedule_id||a.id});
    await stmt(env.DB,"INSERT INTO settings(key,value) VALUES('automation',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify({id:a.id,schedule:a.schedule,enabled:a.enabled,verified_at:Date.now()})).run();value={saved:true,check_saved:!!a.check};
   }
   else return json({jsonrpc:'2.0',id:input.id,error:{code:-32601,message:'Herramienta desconocida'}});

@@ -76,3 +76,13 @@ Rick creó personalmente el repositorio público `Rick2818/Agentes-Ricardo` (Cop
 El objetivo b599fdbb-7714-49cd-b158-ffbe9541de84 terminó planificación, redacción y revisión con tres respuestas reales HTTP 200. El programador de ChatGPT volvió a desactivarse después de una revisión vacía; su resultado registra requires_user_action sin explicar el motivo. El override de acciones de bajo riesgo no corrigió esa desactivación. Sites rechazó enlazar una programación con invalid_project, aunque get_site confirma sitio activo y propietario. La causa interna no está expuesta; no se atribuye a Gemini ni se certifica autonomía continua.
 
 Se prepara un endpoint privado para ejecutar únicamente pendientes existentes y un workflow aislado en runner-package. Este endpoint no cambia la audiencia, no crea encargos y no devuelve entregas privadas. La prueba desde el entorno de desarrollo acredita solo el acceso de servicio; la ejecución desde GitHub y el presupuesto gratuito deben verificarse antes de declarar el reemplazo activo.
+
+## Continuidad: resultado del 24 de octubre, 17:20 El Salvador
+
+- 35 pruebas locales aprobadas; código publicado en el Site.
+- Dos trabajos con fechas futuras terminados desde la ejecución nativa del supervisor; el segundo recuperó un HTTP 503 sin crear otro trabajo. Bloqueo por documento faltante producido y avisado correctamente.
+- Recibos de ciclos, avisos persistentes, separación entre anuncio y lectura y controles de pausa implementados. Abrir o refrescar el navegador ya no ejecuta automáticamente la cola.
+- El límite de cinco pertenece a las tareas de **ChatGPT**, no a GitHub Actions. Impidió mantener simultáneamente el ejecutor y el supervisor. Se archivó el supervisor adicional y se verificó el ejecutor principal activo. No se modificaron otros proyectos.
+- La supervisión independiente sigue pendiente de un disparador que no dependa de ese cupo. El runner preparado de GitHub Actions aún no está activo ni certificado.
+- Hablar, cantar y bailar quedan registrados como capacidades siguientes solicitadas por Rick.
+- Carpeta de trabajo actualizada: `/workspace/projects/agentes-ricardo`; el código se conserva también en `Rick2818/Agentes-Ricardo`. No se afirma haber sincronizado una carpeta de Windows no conectada.
