@@ -48,7 +48,47 @@ export async function enqueue(db,input,now=Date.now()){
  await db.batch(batch);
  return first(db,'SELECT * FROM jobs WHERE id=?',input.id);
 }
+export async function syncNotifications(db){
+ await db.batch([
+  stmt(db,"INSERT OR IGNORE INTO notifications(id,kind,title,message,target_id,created_at) SELECT 'objective-'||id||'-v'||version||'-'||status,CASE status WHEN 'done' THEN 'done' ELSE 'blocked' END,title,CASE status WHEN 'done' THEN 'Tu objetivo terminó y su resultado quedó guardado.' ELSE error END,id,updated_at FROM objectives WHERE status IN ('done','needs_input')"),
+  stmt(db,"INSERT OR IGNORE INTO notifications(id,kind,title,message,target_id,created_at) SELECT 'task-'||id||'-'||status,CASE status WHEN 'done' THEN 'done' ELSE 'blocked' END,title,CASE status WHEN 'done' THEN 'Tu encargo terminó y su resultado quedó guardado.' ELSE error END,id,updated_at FROM jobs WHERE objective_id IS NULL AND kind='task' AND status IN ('done','failed')")
+ ]);
+}
+export async function acknowledgeNotifications(db,ids,channel,now=Date.now()){
+ if(!Array.isArray(ids)||ids.length>30||ids.some(id=>typeof id!=='string'||id.length>200)||!['read','announced'].includes(channel))throw Object.assign(Error('Avisos inválidos.'),{status:400});
+ const column=channel==='read'?'read_at':'announced_at';
+ if(ids.length)await db.batch(ids.map(id=>stmt(db,'UPDATE notifications SET '+column+'=COALESCE('+column+',?) WHERE id=?',now,id)));
+ return {acknowledged:ids.length,channel};
+}
+export async function continuity(db,now=Date.now()){
+ const cycles=await rows(db,'SELECT * FROM agent_cycles ORDER BY started_at DESC,id DESC LIMIT 40');
+ const latest=cycles.find(c=>c.source==='scheduled'&&c.completed_at);
+ const raw=await first(db,"SELECT value FROM settings WHERE key='scheduler_check'");
+ let check=null;try{check=JSON.parse(raw?.value||'null')}catch{}
+ const active=await first(db,"SELECT count(*) AS n,MIN(CASE WHEN status='running' THEN lease_until ELSE next_attempt_at END) AS due FROM jobs WHERE status IN ('queued','waiting','running')");
+ const configuration=await first(db,"SELECT value FROM settings WHERE key='automation'");let enabled=false;try{enabled=JSON.parse(configuration?.value||'null')?.enabled===true}catch{}
+ const stale=!latest||now-latest.completed_at>90*60000;
+ const observedDisabled=check&&now-check.checked_at<90*60000&&!check.is_enabled;
+ const attention=check&&now-check.checked_at<90*60000&&(check.requires_user_action||check.status==='failed');
+ const status=!enabled&&configuration?'paused':observedDisabled?'stopped':attention?'attention':latest&&!stale?'recent':enabled?'unverified':'unconfigured';
+ const stalled=active.n>0&&active.due!=null&&now-active.due>90*60000&&stale;
+ return {status,last_scheduled_cycle:latest||null,cycles,scheduler_check:check,stalled,pending:active.n,oldest_due:active.due||null};
+}
+export async function recordSchedulerCheck(db,a,now=Date.now()){
+ if(!text(a.schedule_id,200)||typeof a.is_enabled!=='boolean'||typeof a.requires_user_action!=='boolean'||!['completed','in_progress','failed','no_update','unknown'].includes(a.status)||!(a.run_id==null||text(a.run_id,200)))throw Object.assign(Error('Comprobación inválida.'),{status:400});
+ for(const key of ['started_at','completed_at'])if(a[key]!=null&&(!Number.isSafeInteger(a[key])||a[key]<0||a[key]>now+300000))throw Object.assign(Error('Fecha de comprobación inválida.'),{status:400});
+ const value={schedule_id:a.schedule_id,is_enabled:a.is_enabled,requires_user_action:a.requires_user_action,status:a.status,run_id:a.run_id||null,started_at:a.started_at||null,completed_at:a.completed_at||null,checked_at:now};
+ await stmt(db,"INSERT INTO settings(key,value) VALUES('scheduler_check',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify(value)).run();
+ const h=await continuity(db,now);
+ const problem=!a.is_enabled||a.requires_user_action||a.status==='failed'||h.stalled;
+ if(problem){
+  const id='scheduler-'+a.schedule_id+'-'+(a.run_id||day(now));
+  await stmt(db,"INSERT OR IGNORE INTO notifications(id,kind,title,message,target_id,created_at) VALUES(?,'interruption','La revisión automática necesita atención',?,?,?)",id,a.requires_user_action?'El programador pide una acción o autorización. Tu trabajo sigue guardado.':!a.is_enabled?'La programación se encontró detenida. Tus pendientes siguen guardados.':h.stalled?'Hay pendientes vencidos y no hay un ciclo reciente del ejecutor. Se conserva el avance para recuperarlo.':'Falló una revisión del programador. Se conserva el avance para reintentar.',a.schedule_id,now).run();
+ }
+ return value;
+}
 export async function board(db,now=Date.now(),env={}){
+ await syncNotifications(db);
  const [jobs,messages,notes,usage,automation,runner,lastRun,objectives,updates]=await Promise.all([
  rows(db,"SELECT * FROM jobs WHERE status IN ('queued','running','waiting','paused') OR id IN (SELECT id FROM jobs ORDER BY created_at DESC LIMIT 100) ORDER BY created_at DESC"),
  rows(db,'SELECT * FROM (SELECT * FROM messages ORDER BY created_at DESC,id DESC LIMIT 100) ORDER BY created_at,id'),
@@ -61,7 +101,22 @@ export async function board(db,now=Date.now(),env={}){
  rows(db,'SELECT * FROM objective_updates WHERE notified=0 ORDER BY created_at LIMIT 30')]);
  let cloud=null,last=null;try{cloud=JSON.parse(automation?.value||'null');last=JSON.parse(lastRun?.value||'null')}catch{}
  const receipt=await first(db,"SELECT value FROM settings WHERE key='cloud_runner_receipt'");
- return {jobs,messages,notes,objectives,updates,usage:{used:usage.n,limit:20},automation:cloud,model:MODEL,server_time:now,health:{configured:!!env.GOOGLE_GENERATIVE_AI_API_KEY,next_run_at:runner?.expires>now?runner.expires:null,last_run:last,cloud_runner:receipt?JSON.parse(receipt.value):null}};
+ const [notifications,autonomy]=await Promise.all([rows(db,'SELECT * FROM notifications ORDER BY created_at DESC,id DESC LIMIT 100'),continuity(db,now)]);
+ return {jobs,messages,notes,objectives,updates,notifications,usage:{used:usage.n,limit:20},automation:cloud,model:MODEL,server_time:now,health:{configured:!!env.GOOGLE_GENERATIVE_AI_API_KEY,next_run_at:runner?.expires>now?runner.expires:null,last_run:last,cloud_runner:receipt?JSON.parse(receipt.value):null,autonomy}};
+}
+export async function runRecordedCycle(db,env,a={},now=Date.now()){
+ const scheduled=a.trigger==='scheduled';
+ if(a.trigger!=null&&!['scheduled','manual'].includes(a.trigger))throw Object.assign(Error('Disparador inválido.'),{status:400});
+ if(scheduled&&(!text(a.cycle_id,200)||!text(a.schedule_id,200)))throw Object.assign(Error('La ejecución programada necesita el identificador del registro y de su programación.'),{status:400});
+ const id=crypto.randomUUID(),source=scheduled?'scheduled':'mcp',cycleId=scheduled?a.cycle_id:id;
+ await stmt(db,"INSERT INTO agent_cycles(id,cycle_id,schedule_id,source,status,started_at) VALUES(?,?,?,?,'running',?)",id,cycleId,scheduled?a.schedule_id:'',source,now).run();
+ try{
+  if(scheduled){const setting=await first(db,"SELECT value FROM settings WHERE key='automation'");let paused=false;try{paused=JSON.parse(setting?.value||'null')?.enabled===false}catch{}if(paused){await stmt(db,"UPDATE agent_cycles SET status='paused',completed_at=? WHERE id=?",Math.max(now,Date.now()),id).run();return {status:'paused'};}}
+  const run=await runNext(db,{...env,RUN_SOURCE:scheduled?'scheduled-mcp':'mcp'},now);
+  await stmt(db,'UPDATE agent_cycles SET status=?,job_id=?,completed_at=? WHERE id=?',run.status,run.id||null,Math.max(now,Date.now()),id).run();
+  await syncNotifications(db);
+  return run;
+ }catch(e){await stmt(db,"UPDATE agent_cycles SET status='error',completed_at=? WHERE id=?",Date.now(),id).run();throw e;}
 }
 async function failJob(db,job,token,error,delay,now){
  const retry=delay!=null;
@@ -158,7 +213,9 @@ export async function createObjective(db,a,now=Date.now()){
  const active=await first(db,"SELECT count(*) AS n FROM objectives WHERE status IN ('planning','working','verifying','paused')");
  if(active.n>=5)throw Object.assign(Error('Ya hay cinco objetivos abiertos. Completá o cancelá uno antes de encargar otro.'),{status:409});
  const o={...a,version:1,revision:0};
- await db.batch([stmt(db,'INSERT OR IGNORE INTO objectives(id,title,description,criteria,created_at,updated_at) VALUES(?,?,?,?,?,?)',a.id,a.title,a.description,a.criteria,now,now),objectiveJob(db,o,'plan',0,'Planificá este objetivo en hasta tres pasos realizables.','Plan: '+a.title,now)]);
+ const due=a.due_at==null?now:a.due_at;
+ if(!Number.isSafeInteger(due)||due<now-60000||due>now+30*86400000)throw Object.assign(Error('Elegí una fecha dentro de los próximos 30 días.'),{status:400});
+ await db.batch([stmt(db,'INSERT OR IGNORE INTO objectives(id,title,description,criteria,created_at,updated_at) VALUES(?,?,?,?,?,?)',a.id,a.title,a.description,a.criteria,now,now),objectiveJob(db,o,'plan',0,'Planificá este objetivo en hasta tres pasos realizables.','Plan: '+a.title,now),stmt(db,"UPDATE jobs SET due_at=?,next_attempt_at=? WHERE objective_id=? AND phase='plan' AND objective_version=1",due,due,a.id)]);
  return first(db,'SELECT * FROM objectives WHERE id=?',a.id);
 }
 export async function controlObjective(db,a,now=Date.now()){
@@ -218,15 +275,17 @@ function objectiveCompletion(db,o,job,output,token,now){
  return changes;
 }
 const toolList=[
- {name:'create_objective',description:'Encargar un objetivo autónomo: planifica hasta tres pasos, los ejecuta y revisa la entrega. Solo redacción y análisis de datos proporcionados. Persiste el progreso y respeta cuotas gratuitas.',inputSchema:{type:'object',properties:{id:{type:'string'},title:{type:'string'},description:{type:'string'},criteria:{type:'string'}},required:['id','title','description','criteria']}},
+ {name:'create_objective',description:'Encargar un objetivo autónomo: planifica hasta tres pasos, los ejecuta y revisa la entrega. Solo redacción y análisis de datos proporcionados. Persiste el progreso y respeta cuotas gratuitas.',inputSchema:{type:'object',properties:{id:{type:'string'},title:{type:'string'},description:{type:'string'},criteria:{type:'string'},due_at:{type:'integer'}},required:['id','title','description','criteria']}},
  {name:'control_objective',description:'Pausar, retomar, cancelar o cambiar instrucciones de un objetivo autónomo existente.',inputSchema:{type:'object',properties:{id:{type:'string'},action:{type:'string',enum:['pause','resume','cancel','steer']},instructions:{type:'string'}},required:['id','action']}},
  {name:'acknowledge_objective_updates',description:'Marcar avisos de objetivos como comunicados, después de preparar su notificación al usuario. No modifica resultados.',inputSchema:{type:'object',properties:{ids:{type:'array',items:{type:'string'}}},required:['ids']}},
  {name:'agent_status',description:'Consultar las tareas, resultados y notas reales de Agente Ricardo.',inputSchema:{type:'object',properties:{}}},
- {name:'run_pending_tasks',description:'Ejecutar un encargo pendiente de Agente Ricardo. Respeta cuotas gratuitas y reintentos. No envía correos ni realiza acciones externas.',inputSchema:{type:'object',properties:{}}},
+ {name:'run_pending_tasks',description:'Ejecutar un encargo pendiente y guardar un recibo del ciclo, incluso con cola vacía. Para programaciones, incluir trigger=scheduled, cycle_id del registro real del programador y schedule_id. Correlacionar estos datos con ese registro para acreditar ejecución programada. Respeta fechas, cuotas y reintentos.',inputSchema:{type:'object',properties:{trigger:{type:'string',enum:['scheduled','manual']},cycle_id:{type:'string'},schedule_id:{type:'string'}}}},
+ {name:'record_scheduler_check',description:'Guardar una comprobación real del programador obtenida con Automations. No activa ni certifica por sí misma una programación. Genera un aviso persistente ante pausa, fallo o acción requerida.',inputSchema:{type:'object',properties:{schedule_id:{type:'string'},is_enabled:{type:'boolean'},requires_user_action:{type:'boolean'},status:{type:'string',enum:['completed','in_progress','failed','no_update','unknown']},run_id:{type:'string'},started_at:{type:'integer'},completed_at:{type:'integer'}},required:['schedule_id','is_enabled','requires_user_action','status']}},
+ {name:'acknowledge_notifications',description:'Registrar que se anunció un aviso en ChatGPT después de emitir su contenido. Este acuse no significa que Rick lo leyó. La lectura solo se confirma desde la bandeja del agente.',inputSchema:{type:'object',properties:{ids:{type:'array',items:{type:'string'}}},required:['ids']}},
  {name:'send_message',description:'Conversar con Agente Ricardo y guardar el intercambio. Reutilizar id para evitar duplicados.',inputSchema:{type:'object',properties:{id:{type:'string'},message:{type:'string'}},required:['id','message']}},
  {name:'create_task',description:'Guardar un encargo real y ejecutar el primer trabajo disponible. Reutilizar id para reintentos sin duplicar.',inputSchema:{type:'object',properties:{id:{type:'string'},title:{type:'string'},prompt:{type:'string'},due_at:{type:'integer'}},required:['id','title','prompt']}},
  {name:'save_note',description:'Guardar o actualizar una preferencia por su título en la memoria real de Agente Ricardo.',inputSchema:{type:'object',properties:{title:{type:'string'},content:{type:'string'}},required:['title','content']}},
- {name:'register_cloud_schedule',description:'Registrar en el tablero la programación en la nube, únicamente después de crearla o verificarla con Sites. No crea ni activa una tarea programada por sí misma.',inputSchema:{type:'object',properties:{id:{type:'string'},schedule:{type:'string'},enabled:{type:'boolean'}},required:['id','schedule','enabled']}}
+ {name:'register_cloud_schedule',description:'Registrar en el tablero la programación en la nube, únicamente después de crearla o verificarla con Sites. No crea ni activa una tarea programada por sí misma.',inputSchema:{type:'object',properties:{id:{type:'string'},schedule:{type:'string'},enabled:{type:'boolean'},check:{type:'object',properties:{is_enabled:{type:'boolean'},requires_user_action:{type:'boolean'},status:{type:'string'},run_id:{type:'string'},started_at:{type:'integer'},completed_at:{type:'integer'}}}},required:['id','schedule','enabled']}}
 ];
 async function mcp(request,env){
  const input=await parse(request);let result;
@@ -241,9 +300,11 @@ async function mcp(request,env){
   else if(input.params?.name==='control_objective')value={objective:await controlObjective(env.DB,input.params.arguments||{}),board:await board(env.DB,Date.now(),env)};
   else if(input.params?.name==='acknowledge_objective_updates'){
    const ids=input.params.arguments?.ids;if(!Array.isArray(ids)||ids.length>30||ids.some(id=>typeof id!=='string'||id.length>140))throw Object.assign(Error('Avisos inválidos'),{status:400});
-   if(ids.length)await env.DB.batch(ids.map(id=>stmt(env.DB,'UPDATE objective_updates SET notified=1 WHERE id=?',id)));value={acknowledged:ids.length};
+   if(ids.length)await env.DB.batch(ids.map(id=>stmt(env.DB,'UPDATE objective_updates SET notified=1 WHERE id=?',id)));await acknowledgeNotifications(env.DB,ids,'announced');value={acknowledged:ids.length};
   }
-  else if(input.params?.name==='run_pending_tasks')value={run:await runNext(env.DB,{...env,RUN_SOURCE:'mcp'}),board:await board(env.DB,Date.now(),env)};
+  else if(input.params?.name==='run_pending_tasks')value={run:await runRecordedCycle(env.DB,env,input.params.arguments||{}),board:await board(env.DB,Date.now(),env)};
+  else if(input.params?.name==='record_scheduler_check')value={check:await recordSchedulerCheck(env.DB,input.params.arguments||{}),board:await board(env.DB,Date.now(),env)};
+  else if(input.params?.name==='acknowledge_notifications')value=await acknowledgeNotifications(env.DB,input.params.arguments?.ids,'announced');
   else if(input.params?.name==='send_message'){
    const a=input.params.arguments||{};const job=await enqueue(env.DB,{id:a.id,kind:'chat',text:a.message});
    value={job,run:await runNext(env.DB,env),board:await board(env.DB,Date.now(),env)};
@@ -258,7 +319,8 @@ async function mcp(request,env){
   }
   else if(input.params?.name==='register_cloud_schedule'){
    const a=input.params.arguments||{};if(!text(a.id,200)||!text(a.schedule,200)||typeof a.enabled!=='boolean')throw Object.assign(Error('Programación inválida'),{status:400});
-   await stmt(env.DB,"INSERT INTO settings(key,value) VALUES('automation',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify({...a,verified_at:Date.now()})).run();value={saved:true};
+   if(a.check)await recordSchedulerCheck(env.DB,{...a.check,schedule_id:a.id});
+   await stmt(env.DB,"INSERT INTO settings(key,value) VALUES('automation',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify({id:a.id,schedule:a.schedule,enabled:a.enabled,verified_at:Date.now()})).run();value={saved:true,check_saved:!!a.check};
   }
   else return json({jsonrpc:'2.0',id:input.id,error:{code:-32601,message:'Herramienta desconocida'}});
   result={content:[{type:'text',text:JSON.stringify(value)}]};
@@ -293,6 +355,13 @@ export default {async fetch(request,env,ctx){
    if(!env.DB)return json({error:'El almacenamiento todavía no está disponible.'},503);
    if(!['GET','HEAD'].includes(request.method)&&request.headers.get('origin')!==url.origin)return json({error:'Origen no permitido.'},403);
    if(url.pathname==='/api/board'&&request.method==='GET')return json(await board(env.DB,Date.now(),env));
+   if(url.pathname==='/api/notifications/read'&&request.method==='POST'){const a=await parse(request);return json(await acknowledgeNotifications(env.DB,a.ids,'read'));}
+   if(url.pathname==='/api/autonomy/desired'&&request.method==='POST'){
+    const a=await parse(request);if(typeof a.enabled!=='boolean')return json({error:'Indicá si querés pausar o retomar el trabajo programado.'},400);
+    const raw=await first(env.DB,"SELECT value FROM settings WHERE key='automation'");let setting;try{setting=JSON.parse(raw?.value||'null')}catch{}
+    if(!setting)return json({error:'Todavía no hay una programación registrada.'},409);
+    await stmt(env.DB,"UPDATE settings SET value=? WHERE key='automation'",JSON.stringify({...setting,enabled:a.enabled,user_changed_at:Date.now()})).run();return json({ok:true,enabled:a.enabled});
+   }
    if(url.pathname==='/api/objectives'&&request.method==='POST'){const objective=await createObjective(env.DB,await parse(request));ctx.waitUntil(runNext(env.DB,env));return json({objective},202);}
    if(url.pathname==='/api/objectives/control'&&request.method==='POST'){const objective=await controlObjective(env.DB,await parse(request));ctx.waitUntil(runNext(env.DB,env));return json({objective});}
    if(url.pathname==='/api/jobs'&&request.method==='POST'){

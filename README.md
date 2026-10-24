@@ -38,3 +38,7 @@ El programador existente invoca las herramientas privadas del agente para avanza
 No modificar otros proyectos ni habilitar servicios de pago sin autorización.
 
 Repositorio del proyecto: https://github.com/Rick2818/Agentes-Ricardo . Creado por Rick; no depende de Copilot.
+
+## Continuidad y avisos
+
+La bandeja de avisos conserva entregas, bloqueos y acuses de lectura. El ejecutor y un supervisor independientes del navegador registran ciclos y comprueban interrupciones. Abrir la página ya no ejecuta la cola automáticamente. Consultar [CONTINUIDAD.md](CONTINUIDAD.md) para controles, evidencia y límites. La validación local consta de 34 pruebas; la comprobación de ciclos reales permanece documentada por separado.
