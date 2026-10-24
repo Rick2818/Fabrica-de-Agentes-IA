@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+*.tar.gz
+*.sqlite
+*.sqlite-*
+.DS_Store
+
+# Recursos generados mediante scripts/build.mjs
+dist/
+worker/index.js

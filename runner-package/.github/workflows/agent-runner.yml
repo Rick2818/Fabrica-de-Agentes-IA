@@ -1,0 +1,47 @@
+name: Agente Ricardo
+on:
+  schedule:
+    - cron: '19 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: agente-ricardo
+  cancel-in-progress: false
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SITE_ORIGIN: ${{ vars.SITE_ORIGIN }}
+      SITE_SERVICE_BEARER: ${{ secrets.SITE_SERVICE_BEARER }}
+      AGENT_RUNNER_SECRET: ${{ secrets.AGENT_RUNNER_SECRET }}
+    steps:
+      - name: Procesar encargos existentes
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const origin = process.env.SITE_ORIGIN;
+          const bearer = process.env.SITE_SERVICE_BEARER;
+          const key = process.env.AGENT_RUNNER_SECRET;
+          if (origin !== 'https://agente-ricardo-revision-rick.glassybell1025.chatgpt.site' || !bearer || !key) {
+            throw new Error('Falta la configuración privada del ejecutor.');
+          }
+          let phases = 0;
+          for (let calls = 0; calls < 16 && phases < 8; calls++) {
+            const response = await fetch(origin + '/internal/runner', {
+              method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(35000),
+              headers: {'OAI-Sites-Authorization': 'Bearer ' + bearer, 'x-agent-runner-key': key}
+            });
+            if (!response.ok) throw new Error('El ejecutor devolvió HTTP ' + response.status);
+            const {run, receipt} = await response.json();
+            if (!run || !receipt) throw new Error('Respuesta inválida; no se acredita ejecución.');
+            console.log(JSON.stringify({status:run.status, pending:receipt.pending, completed_at:receipt.completed_at}));
+            if (run.status === 'done') phases++;
+            if (['failed','error','unconfigured'].includes(run.status)) throw new Error('Ejecución detenida: ' + run.status);
+            if (['quota','waiting','needs_input','idle'].includes(run.status) || receipt.pending === 0) break;
+            if (!['done','cancelled','busy'].includes(run.status)) throw new Error('Estado desconocido.');
+            const delay = Math.max(0, (receipt.next_at || Date.now()) - Date.now());
+            if (delay > 30000) break;
+            if (delay) await new Promise(resolve => setTimeout(resolve, delay + 100));
+          }
+          NODE
