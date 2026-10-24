@@ -1,18 +1,21 @@
-# Ejecutor independiente de Agente Ricardo
+# Ejecutor de Fábrica de Agentes IA
 
-Estado: paquete preparado; NO instalado ni certificado en GitHub.
+La versión canónica es [.github/workflows/agent-runner.yml](../.github/workflows/agent-runner.yml), en Rick2818/Fabrica-de-Agentes-IA (ID 1432658222). Esta copia se conserva sincronizada como referencia; no instalar otro disparador.
 
-Copiar `.github/workflows/agent-runner.yml` a un repositorio privado exclusivo de Rick2818 para Agente Ricardo. No usar Boltech ni ASMAS.
+## Configuración
 
-Variable de Actions: `SITE_ORIGIN`, con el origen exacto del Site.
-Secretos de Actions: `SITE_SERVICE_BEARER` (credencial de acceso al Site, obtenida mediante Sites) y `AGENT_RUNNER_SECRET` (la misma clave limitada configurada en el runtime del Site). Nunca ponerlos en archivos, URL, conversaciones ni logs. No necesita la API key de Gemini: esa clave permanece exclusivamente en Sites.
+- Secretos de Actions: `SITE_SERVICE_BEARER` y `AGENT_RUNNER_SECRET`. La API key de Gemini permanece exclusivamente en Sites.
+- Variable `AGENT_RUNNER_ENABLED=true` para permitir ejecutar el job. Mientras falte o sea false, el job se omite. La pausa del tablero también se respeta en el servidor.
+- Guardar credenciales en GitHub amplía el acceso del ejecutor: requiere confirmación específica antes de introducirlas. Nunca imprimirlas ni incluirlas en código, URL o registros.
 
-Antes de activar: comprobar los minutos gratuitos restantes de la cuenta y que el presupuesto no permita gasto adicional. El repositorio privado comparte la cuota gratuita de la cuenta. No se garantiza que haya minutos disponibles. Este paquete no cambia facturación.
+El workflow corre en main a los minutos 7, 22, 37 y 52 de cada hora UTC, además de permitir una ejecución manual. Usa Linux estándar, sin acciones de terceros ni permisos del GITHUB_TOKEN. Descarga únicamente el script del mismo commit en este repositorio. Los secretos se entregan solo al paso de ejecución.
 
-El workflow usa el runner estándar Linux, no descarga dependencias ni ejecuta acciones de terceros. Máximo cinco minutos por ciclo; revisa cada hora al minuto 19. GitHub puede retrasar u omitir ejecuciones programadas; la cola conserva el avance para el siguiente intento.
+Cada ciclo procesa como máximo ocho fases o dieciséis llamadas en cuatro minutos; el job tiene cinco minutos de límite. No espera más de treinta segundos ni adelanta fechas. Cuotas, pausas, cancelaciones, leases y reintentos se aplican en el servidor. Un error HTTP falla cerrado.
 
-`POST /internal/runner` necesita las dos credenciales independientes: Sites valida su credencial y el Worker verifica la clave limitada. No proporciona identidad de visitante ni acceso a otras apps. Solo ejecuta un trabajo existente por llamada y devuelve un recibo sin notas, mensajes ni entregas privadas. La cuota, las fechas, las cancelaciones y las leases siguen controladas por el mismo servidor.
+`POST /internal/runner` exige la credencial de servicio validada por Sites y la clave limitada del runtime. El contexto permitido contiene el repositorio, run_id, intento, evento y commit; el servidor guarda estos datos con el recibo. No devuelve notas, mensajes ni entregas. El contexto declarado debe contrastarse con los registros reales de GitHub; no acredita por sí solo su procedencia.
 
-Certificación: ejecutar Run workflow; comprobar el resultado del job y `health.cloud_runner` mediante `agent_status`. Para acreditar trabajo real, usar un encargo autorizado pendiente, cerrar la página y verificar el resultado persistido y su evidencia. Una respuesta `idle` solo acredita conexión y lectura de cola, no una ejecución de Gemini.
+## Certificación pendiente
 
-No retirar el mecanismo anterior hasta verificar el reemplazo. Si Sites cambia o revoca su credencial de servicio, el runner falla cerrado y conserva los pendientes. Actualizar el secreto mediante el acceso soportado; no relajar la audiencia.
+Comprobar un Run workflow real y un evento schedule real, sus recibos y resultados persistidos. Un resultado idle solo demuestra conexión y cola vacía. Utilizar datos sintéticos y revisar el contexto enviado al proveedor; no usar información personal o confidencial mientras esté pendiente la revisión de privacidad. No retirar el mecanismo anterior hasta certificar el reemplazo.
+
+GitHub puede retrasar u omitir eventos programados y deshabilitar la programación de repositorios públicos tras sesenta días sin actividad. Estas restricciones impiden prometer disponibilidad continua. Fuentes oficiales: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows y https://docs.github.com/en/actions/concepts/billing-and-usage .

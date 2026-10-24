@@ -13,3 +13,4 @@ Estas reglas son controles de desarrollo, no una certificación jurídica.
 - Conservar evidencia ante reclamaciones, limitar la función cuestionada cuando corresponda y remitir a asesoría. No responder jurídicamente ni contactar terceros sin instrucciones.
 - No adoptar una licencia global del repositorio sin verificar titularidad y obligaciones de terceros. No confundir repositorio público con autorización general de uso.
 - Las reglas escritas no sustituyen controles técnicos ni verifican por sí solas el cumplimiento de versiones anteriores.
+

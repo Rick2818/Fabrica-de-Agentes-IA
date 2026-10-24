@@ -52,7 +52,7 @@ El Site existente se conserva como alojamiento y mantiene su identidad y audienc
 
 El programador existente invoca las herramientas privadas del agente para avanzar los pendientes. Se debe contrastar el registro de cada ejecución programada con la evidencia de los trabajos guardados. `execution_source` identifica la ruta de ejecución; por sí mismo no demuestra un horario ni el estado físico de la laptop.
 
-`runner-package/` conserva una alternativa de GitHub Actions preparada, todavía sin instalar ni certificar. No activar ambos disparadores como reemplazo sin verificar su configuración y los límites gratuitos. La API key de Gemini permanece exclusivamente en el entorno del Site; nunca se copia al código ni al navegador.
+El workflow de GitHub Actions y `scripts/run-cloud-queue.mjs` contienen el reemplazo preparado. Falta configurar sus secretos, habilitarlo y certificarlo en GitHub. `runner-package/` conserva una copia de referencia. No activar ambos disparadores como reemplazo sin verificar su configuración y los límites gratuitos. La API key de Gemini permanece exclusivamente en el entorno del Site; nunca se copia al código ni al navegador.
 
 No modificar otros proyectos ni habilitar servicios de pago sin autorización.
 
@@ -60,6 +60,6 @@ Repositorio del proyecto: https://github.com/Rick2818/Fabrica-de-Agentes-IA . Cr
 
 ## Continuidad y avisos
 
-La bandeja de avisos conserva entregas, bloqueos y acuses de lectura. El ejecutor y un supervisor independientes del navegador registran ciclos y comprueban interrupciones. Abrir la página ya no ejecuta la cola automáticamente. Consultar [CONTINUIDAD.md](CONTINUIDAD.md) para controles, evidencia y límites. La validación local consta de 35 pruebas; la comprobación de ciclos reales permanece documentada por separado.
+La bandeja de avisos conserva entregas, bloqueos y acuses de lectura. El ejecutor y un supervisor independientes del navegador registran ciclos y comprueban interrupciones. Abrir la página ya no ejecuta la cola automáticamente. Consultar [CONTINUIDAD.md](CONTINUIDAD.md) para controles, evidencia y límites. La validación local consta de 37 pruebas del servidor y 7 del ejecutor; la comprobación de ciclos reales permanece documentada por separado.
 
 Estado operativo al iniciar la revisión legal: el ejecutor de ChatGPT está pausado; el supervisor separado se archivó por el cupo de tareas de ChatGPT. Esto no limita la creación de workflows de GitHub Actions. El runner de GitHub sigue preparado y sin activar. Ver CONTINUIDAD.md para la evidencia y el límite pendiente.

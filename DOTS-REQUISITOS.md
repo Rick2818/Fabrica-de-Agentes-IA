@@ -1,6 +1,6 @@
 # Objetivo: equivalencia funcional con Dots
 
-Fecha de revisión: 24 de octubre de 2026. Alcance: Agente Ricardo, implementación propia. Una capacidad se acepta por su comportamiento y evidencia; la apariencia por sí sola no acredita equivalencia. La meta completa supera el MVP actual.
+Fecha de revisión: 24 de octubre de 2026. Alcance: Fábrica de Agentes IA, implementación propia. Una capacidad se acepta por su comportamiento y evidencia; la apariencia por sí sola no acredita equivalencia. La meta completa supera el MVP actual.
 
 ## Referencias oficiales
 
@@ -69,7 +69,7 @@ La ejecución programada `d81eff77-4ff8-832b-9c0a-691186a8dd61` terminó entre 2
 
 La programación permaneció habilitada después de completar ese ciclo. Esto acredita una recuperación y entrega coordinadas por una ejecución del programador en nube; no acredita continuidad indefinida ni puntualidad exacta (el registro indica una hora programada posterior al comienzo real). No se retira el mecanismo preparado de respaldo ni se declara certificación de todas las capacidades de Dots.
 
-Rick creó personalmente el repositorio público `Rick2818/Agentes-Ricardo` (Copilot no funciona en su cuenta). El conector confirmó acceso de escritura y un README inicial. Esta copia conserva ese texto y añade el código fuente, las migraciones, las pruebas y la documentación. El Site conserva su alojamiento y datos; el respaldo de código en GitHub no activa por sí mismo un ejecutor ni cambia la publicación.
+Rick creó personalmente el repositorio público `Rick2818/Fabrica-de-Agentes-IA` (Copilot no funciona en su cuenta). El conector confirmó acceso de escritura y un README inicial. Esta copia conserva ese texto y añade el código fuente, las migraciones, las pruebas y la documentación. El Site conserva su alojamiento y datos; el respaldo de código en GitHub no activa por sí mismo un ejecutor ni cambia la publicación.
 
 ## Ejecutor independiente: preparación del 24 de octubre
 
@@ -85,4 +85,8 @@ Se prepara un endpoint privado para ejecutar únicamente pendientes existentes y
 - El límite de cinco pertenece a las tareas de **ChatGPT**, no a GitHub Actions. Impidió mantener simultáneamente el ejecutor y el supervisor. Se archivó el supervisor adicional y se verificó el ejecutor principal activo. No se modificaron otros proyectos.
 - La supervisión independiente sigue pendiente de un disparador que no dependa de ese cupo. El runner preparado de GitHub Actions aún no está activo ni certificado.
 - Hablar, cantar y bailar quedan registrados como capacidades siguientes solicitadas por Rick.
-- Carpeta de trabajo actualizada: `/workspace/projects/agentes-ricardo`; el código se conserva también en `Rick2818/Agentes-Ricardo`. No se afirma haber sincronizado una carpeta de Windows no conectada.
+- Carpeta de trabajo actualizada: `/workspace/projects/fabrica-de-agentes-ia`; el código se conserva también en `Rick2818/Fabrica-de-Agentes-IA`. No se afirma haber sincronizado una carpeta de Windows no conectada.
+
+## Cambio de nombre solicitado por Rick
+
+El 24-10-2026 el proyecto y su repositorio pasaron a llamarse Fábrica de Agentes IA / Rick2818/Fabrica-de-Agentes-IA. Se conservaron el repositorio (id 1432658222), historial, Site, base de datos, credenciales y registros anteriores. Los identificadores históricos y la URL técnica del Site se mantienen para no romper accesos.
