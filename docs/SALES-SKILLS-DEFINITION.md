@@ -25,3 +25,9 @@ Esta instrucción está incorporada en el prompt del servidor para todas las pr�
 ## Certificación de esta etapa
 
 Las aprobaciones se refieren a escenarios sintéticos y revisión manual del asistente. Las prácticas reales con Gemini probaron respuesta en ficha, criterios, evidencia y persistencia. La definición de una habilidad no equivale a su ejecución comercial autónoma.
+
+## Skill ejecutable de prospección con prompt reutilizable
+
+Código: worker/sales-prospecting.mjs, id ventas.prospeccion-con-dolor.v1. La ficha Ventas muestra el prompt canónico con «Copiar prompt de búsqueda» y «Usar en una práctica». El escenario marcado [SKILL:VENTAS-PROSPECCION-V1] incorpora la skill desde el servidor, con una sola definición canónica. La revisión se vincula también a esa versión del prompt.
+
+Integración recomendada para oportunidades publicadas: Upwork MCP oficial, con las skills upwork-workflows y write-proposal. Cubre búsqueda de trabajos, detalle del anuncio, propuestas, mensajes, ofertas, contratos y seguimiento de hitos, según rol y permisos. Una publicación es señal de demanda, no prueba de encaje ni contratación garantizada. Envíos de propuestas pueden consumir Connects; actos vinculantes y movimientos de dinero requieren completar la acción en Upwork. La recomendación y la disponibilidad del plugin en ChatGPT no constituyen conexión del runtime de la Fábrica.

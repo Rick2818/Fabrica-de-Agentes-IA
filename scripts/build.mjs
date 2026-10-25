@@ -3,7 +3,7 @@ import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const assets=Object.fromEntries(['index.html','style.css','app.js','entrenamiento.html','entrenamiento.css','entrenamiento.js'].map(name=>[name,readFileSync(resolve(root,'web',name),'utf8')]));
-const runtime=readFileSync(resolve(root,'worker/runtime.mjs'),'utf8');
+const runtime=readFileSync(resolve(root,'worker/runtime.mjs'),'utf8').replace("import {SALES_PROSPECTING_SKILL} from './sales-prospecting.mjs';",readFileSync(resolve(root,'worker/sales-prospecting.mjs'),'utf8').replace('export const SALES_PROSPECTING_SKILL','const SALES_PROSPECTING_SKILL'));
 const source='const assets='+JSON.stringify(assets)+';\n'+runtime;
 writeFileSync(resolve(root,'worker/index.js'),source);
 rmSync(resolve(root,'dist'),{recursive:true,force:true});

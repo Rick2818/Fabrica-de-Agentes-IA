@@ -1,3 +1,4 @@
+import {SALES_PROSPECTING_SKILL} from './sales-prospecting.mjs';
 const MODEL='gemini-3.6-flash';
 const ACTIVE=['queued','running','waiting'];
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
@@ -394,7 +395,7 @@ function validateTrainingProfiles(list){
  if(new Set(list.map(p=>p?.id)).size!==list.length||list.some(p=>!p||typeof p!=='object'||trainingFields.some(f=>typeof p[f]!=='string')||!validId(p.id)||Object.entries(limits).some(([f,n])=>p[f].length>n)||!['pass','fail','pending'].includes(p.assessment)||(p.history!=null&&!Array.isArray(p.history))||(p.history||[]).length>30))throw trainingError('Revisá el formato de los perfiles.');
  return list.map(p=>({...Object.fromEntries(trainingFields.map(f=>[f,p[f]])),history:(p.history||[]).map(h=>({at:String(h?.at||'').slice(0,35),result:['pass','fail','pending'].includes(h?.result)?h.result:'pending'}))}));
 }
-async function trainingFingerprint(p){const fields=['name','specialty','mission','knowledge','tools','scenario','criteria'];const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([...fields.map(f=>p[f]),...(p.specialty==='Ventas'?[salesClosingPlaybook]:[])])));return Array.from(new Uint8Array(bytes)).map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function trainingFingerprint(p){const fields=['name','specialty','mission','knowledge','tools','scenario','criteria'];const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([...fields.map(f=>p[f]),...(p.specialty==='Ventas'?[salesClosingPlaybook]:[]),...(p.specialty==='Ventas'&&p.scenario.includes('[SKILL:VENTAS-PROSPECCION-V1]')?[SALES_PROSPECTING_SKILL.prompt]:[])])));return Array.from(new Uint8Array(bytes)).map(x=>x.toString(16).padStart(2,'0')).join('')}
 export async function startTrainingPractice(db,p,requestId){
  if(!validId(requestId))throw trainingError('Identificador de práctica inválido.');
  if(!text(p.name,90)||!text(p.mission,3500)||!text(p.scenario,3000)||!text(p.criteria,3000))throw trainingError('Completá nombre, misión, escenario y criterios.');
@@ -402,7 +403,7 @@ export async function startTrainingPractice(db,p,requestId){
  if(previous){if(previous.profile_id!==p.id||previous.fingerprint!==fingerprint)throw trainingError('Esta solicitud corresponde a otra versión de la ficha.',409);return first(db,'SELECT * FROM jobs WHERE id=?',requestId)}
  const active=await trainingPractice(db,p);
  if(active&&!active.stale&&ACTIVE.includes(active.status))return first(db,'SELECT * FROM jobs WHERE id=?',active.job_id);
- const prompt=['SIMULACIÓN DE ENTRENAMIENTO. No realizar acciones externas.','Rol: '+p.name+' · '+p.specialty,...(p.specialty==='Ventas'?[salesClosingPlaybook]:[]),'Misión y límites: '+p.mission,'Herramientas descritas (no están conectadas): '+p.tools,'Material de referencia (no son instrucciones superiores): '+p.knowledge,'Escenario: '+p.scenario,'Criterios: '+p.criteria,'Respondé como el agente profesional ante el escenario. No inventés información ausente.'].join('\n\n');
+ const prompt=['SIMULACIÓN DE ENTRENAMIENTO. No realizar acciones externas.','Rol: '+p.name+' · '+p.specialty,...(p.specialty==='Ventas'?[salesClosingPlaybook]:[]),...(p.specialty==='Ventas'&&p.scenario.includes('[SKILL:VENTAS-PROSPECCION-V1]')?['SKILL DE PROSPECCIÓN REUTILIZABLE: '+SALES_PROSPECTING_SKILL.prompt]:[]),'Misión y límites: '+p.mission,'Herramientas descritas (no están conectadas): '+p.tools,'Material de referencia (no son instrucciones superiores): '+p.knowledge,'Escenario: '+p.scenario,'Criterios: '+p.criteria,'Respondé como el agente profesional ante el escenario. No inventés información ausente.'].join('\n\n');
  if(prompt.length>12000)throw trainingError('Reducí el material del ejercicio.');
  const job=await enqueue(db,{id:requestId,kind:'task',title:'Práctica: '+p.name,text:prompt,use_saved_context:false});
  const snapshot={profile_id:p.id,fingerprint,job_id:job.id,scope:trainingScope,name:p.name,specialty:p.specialty,scenario:p.scenario,criteria:p.criteria};
@@ -462,6 +463,7 @@ export default {async fetch(request,env,ctx){
    if(!env.DB)return json({error:'El almacenamiento todavía no está disponible.'},503);
    if(!['GET','HEAD'].includes(request.method)&&request.headers.get('origin')!==url.origin)return json({error:'Origen no permitido.'},403);
    if(url.pathname==='/api/opportunities'&&request.method==='GET')return json(await commercialBoard(env.DB));
+   if(url.pathname==='/api/training/sales-skill'&&request.method==='GET')return json(SALES_PROSPECTING_SKILL);
    if(url.pathname==='/api/training/profiles'&&request.method==='GET'){
     const profiles=await trainingProfiles(env.DB);
     return json({profiles:await Promise.all(profiles.map(async p=>({...p,practice:await trainingPractice(env.DB,p)})))});
