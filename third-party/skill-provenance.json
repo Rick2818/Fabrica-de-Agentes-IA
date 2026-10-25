@@ -1,0 +1,242 @@
+{
+  "reviewed_on": "2026-10-25",
+  "scope": "17 procedimientos adaptados para entrenamiento. No instala ni hereda conexiones del plugin original.",
+  "skills": [
+    {
+      "id": "grow-pipeline",
+      "specialty": "Ventas",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/small-business/skills/grow-pipeline/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/grow-pipeline.md",
+      "adapted": "skills/grow-pipeline/SKILL.md"
+    },
+    {
+      "id": "lead-finder",
+      "specialty": "Ventas",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/small-business/skills/lead-finder/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/lead-finder.md",
+      "adapted": "skills/lead-finder/SKILL.md"
+    },
+    {
+      "id": "proposal-builder",
+      "specialty": "Ventas",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/small-business/skills/proposal-builder/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/proposal-builder.md",
+      "adapted": "skills/proposal-builder/SKILL.md"
+    },
+    {
+      "id": "handle-objection",
+      "specialty": "Ventas",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/sales/skills/handle-objection/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/handle-objection.md",
+      "adapted": "skills/handle-objection/SKILL.md"
+    },
+    {
+      "id": "close-plan",
+      "specialty": "Ventas",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/sales/skills/close-plan/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/close-plan.md",
+      "adapted": "skills/close-plan/SKILL.md"
+    },
+    {
+      "id": "social-intent-monitoring",
+      "specialty": "Ventas",
+      "version": 1,
+      "source": {
+        "author": "LeadMagic",
+        "url": "https://github.com/LeadMagic/gtm-skills/blob/2b7ec0f9e7044f46e4c77b536f486303fd863e28/skills/prospecting/social-intent-monitoring/SKILL.md",
+        "commit": "2b7ec0f9e7044f46e4c77b536f486303fd863e28",
+        "license": "MIT",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/social-intent-monitoring.md",
+      "adapted": "skills/social-intent-monitoring/SKILL.md"
+    },
+    {
+      "id": "ticket-triage",
+      "specialty": "Servicio al cliente",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/customer-support/skills/ticket-triage/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/ticket-triage.md",
+      "adapted": "skills/ticket-triage/SKILL.md"
+    },
+    {
+      "id": "draft-response",
+      "specialty": "Servicio al cliente",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/customer-support/skills/draft-response/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/draft-response.md",
+      "adapted": "skills/draft-response/SKILL.md"
+    },
+    {
+      "id": "customer-escalation",
+      "specialty": "Servicio al cliente",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/customer-support/skills/customer-escalation/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/customer-escalation.md",
+      "adapted": "skills/customer-escalation/SKILL.md"
+    },
+    {
+      "id": "reconciliation",
+      "specialty": "Finanzas",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/finance/skills/reconciliation/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/reconciliation.md",
+      "adapted": "skills/reconciliation/SKILL.md"
+    },
+    {
+      "id": "variance-analysis",
+      "specialty": "Finanzas",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/finance/skills/variance-analysis/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/variance-analysis.md",
+      "adapted": "skills/variance-analysis/SKILL.md"
+    },
+    {
+      "id": "scientific-problem-selection",
+      "specialty": "Química y farmacia",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/bio-research/skills/scientific-problem-selection/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/scientific-problem-selection.md",
+      "adapted": "skills/scientific-problem-selection/SKILL.md"
+    },
+    {
+      "id": "compound-evidence",
+      "specialty": "Química y farmacia",
+      "version": 1,
+      "source": {
+        "author": "Fábrica de Agentes IA",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/docs/pug-rest",
+        "license": "Implementación propia; datos con atribución a PubChem"
+      },
+      "original": null,
+      "adapted": "skills/compound-evidence/SKILL.md"
+    },
+    {
+      "id": "inventory-planner",
+      "specialty": "Logística",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/small-business/skills/inventory-planner/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/inventory-planner.md",
+      "adapted": "skills/inventory-planner/SKILL.md"
+    },
+    {
+      "id": "restock",
+      "specialty": "Logística",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/small-business/skills/restock/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/restock.md",
+      "adapted": "skills/restock/SKILL.md"
+    },
+    {
+      "id": "campaign-plan",
+      "specialty": "Mercadeo",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/marketing/skills/campaign-plan/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/campaign-plan.md",
+      "adapted": "skills/campaign-plan/SKILL.md"
+    },
+    {
+      "id": "performance-report",
+      "specialty": "Mercadeo",
+      "version": 1,
+      "source": {
+        "author": "anthropics",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/marketing/skills/performance-report/SKILL.md",
+        "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+        "license": "Apache-2.0",
+        "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+      },
+      "original": "third-party/skills/performance-report.md",
+      "adapted": "skills/performance-report/SKILL.md"
+    }
+  ]
+}

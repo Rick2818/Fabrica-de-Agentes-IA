@@ -1,5 +1,7 @@
 # Capacidades y requisitos de los agentes
 
+> Actualización 25-10-2026: el Centro de Especialización incorpora seis perfiles, 17 skills con procedencia y seis operaciones analíticas del MCP propio. La respuesta de Gemini se enlaza a la ficha; los resultados de herramienta se incorporan mediante recibos del mismo perfil. 107 verificaciones locales pasan; ver SPECIALTIES.md y evidence/specialties-2026-10-25.json. El alcance continúa en entrenamiento; no hay aprobación operativa de las nuevas especialidades ni acceso heredado a sistemas de clientes.
+
 > Estado más reciente: GitHub está habilitado cada 15 minutos y la conexión manual se comprobó en el run 40144699221. La versión 21 añade encargos directos sin memoria por defecto. La prueba automática de una entrega está en curso; el historial siguiente conserva evidencia de etapas anteriores.
 
 

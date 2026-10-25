@@ -2,7 +2,7 @@ name: Training regression certification
 on:
   push:
     branches: [main, fix/training-payload-limit]
-    paths: ["web/**", "worker/**", "scripts/**", ".github/workflows/training-regression.yml"]
+    paths: ["skills/**", "third-party/**", "web/**", "worker/**", "scripts/**", ".github/workflows/training-regression.yml"]
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-25",
+  "scope": "Fábrica de Agentes IA; especialidades reutilizables sin negocio asignado",
+  "local_tests": {
+    "server": 95,
+    "runner": 7,
+    "ui": 5,
+    "total": 107,
+    "model": "simulado",
+    "database": "SQLite real"
+  },
+  "skills": 17,
+  "specialties": 6,
+  "mcp_operations": 6,
+  "forward_test": {
+    "cases": 4,
+    "scope": "Aplicación independiente de conciliación, reposición, evidencia química y escalamiento sobre datos sintéticos.",
+    "result": "Cálculos correctos; no confunde análisis con aprobación, compra ni seguridad clínica."
+  },
+  "limits": [
+    "Conectores privados no heredados de ChatGPT",
+    "Sin campaña, compra, contabilización, prescripción ni publicación automática",
+    "Gemini no llama herramientas por sí solo; consume el recibo ejecutado desde ficha",
+    "Consulta PubChem pendiente de comprobación productiva",
+    "Ningún perfil nuevo recibe aprobación operativa"
+  ],
+  "provenance": "third-party/skill-provenance.json"
+}
