@@ -23,7 +23,7 @@ El MCP publica `specialty_skills` para consultar el catálogo y ejemplos de entr
 
 ## Evidencia y alcance
 
-114 comprobaciones locales: servidor y SQLite, proveedor simulado, recuperación de errores, aislamiento de perfiles, todas las selecciones de skills, recibos y cálculo de herramientas, más interfaz simulada. Cuatro ejercicios independientes de aplicación de skills verificaron cálculos y límites. No equivalen a certificación contable, clínica, regulatoria ni operacional del perfil completo.
+115 comprobaciones locales: servidor y SQLite, proveedor simulado, recuperación de errores, aislamiento de perfiles, todas las selecciones de skills, recibos y cálculo de herramientas, más interfaz simulada. Cuatro ejercicios independientes de aplicación de skills verificaron cálculos y límites. No equivalen a certificación contable, clínica, regulatoria ni operacional del perfil completo.
 
 Quedan por configurar y validar con cada cliente: sus sistemas de soporte, contabilidad, inventario, transporte, analítica, CRM y publicaciones. No se habilitó facturación ni se cambió el modelo. La revisión profesional corresponde al alcance de finanzas y química/farmacia antes de decisiones o uso regulado.
 

@@ -4,8 +4,8 @@
   "local_tests": {
     "server": 102,
     "runner": 7,
-    "ui": 5,
-    "total": 114,
+    "ui": 6,
+    "total": 115,
     "model": "simulado",
     "database": "SQLite real"
   },
@@ -13,8 +13,8 @@
   "specialties": 6,
   "mcp_operations": 8,
   "forward_test": {
-    "cases": 4,
-    "scope": "Aplicación independiente de conciliación, reposición, evidencia química y escalamiento sobre datos sintéticos.",
+    "cases": 5,
+    "scope": "Aplicación independiente de conciliación, reposición, evidencia química y escalamiento sobre datos sintéticos. Registro SV: clasifica expediente ficticio y conserva pendientes sin aprobar ni presentar.",
     "result": "Cálculos correctos; no confunde análisis con aprobación, compra ni seguridad clínica."
   },
   "limits": [
@@ -30,7 +30,9 @@
     "finance_reconcile": "26bd4fa8-8f23-44a9-91de-d9926b759033",
     "logistics_reorder": "8fa43b3c-3a1b-4076-b521-fe241560e397",
     "marketing_metrics": "26f27166-99e2-46eb-ad8c-cf3bea64596a",
-    "chemistry_lookup": "cda188e7-6f28-468b-9a7f-c109a6d4e798"
+    "chemistry_lookup": "cda188e7-6f28-468b-9a7f-c109a6d4e798",
+    "pharma_dossier_check": "f629f225-6765-44d0-9340-a6316951157b",
+    "sv_registration_plan": "75182f7b-7422-4608-b988-c9340e56d156"
   },
   "live_pharma_ui": {
     "profile_id": "c10ba475-d370-47a2-9afa-38c870983e12",
@@ -43,6 +45,30 @@
     "scope": "Preparación de índice, prelista, solicitud de faltantes y clasificación por modalidad. Sin presentación a SRS.",
     "sources_reviewed": "2026-10-25",
     "guide_full_download": "Pendiente: sitio de descarga no accesible en esta revisión; no sustituir guía vigente por prelista",
-    "live_status": "Pendiente de prueba productiva de nueva operación"
+    "live_status": "MCP productivo verificado con recibo; expediente UI guardado y actualización de etiqueta comprobados.",
+    "profile_id": "c87333e0-5637-4e35-9b1e-b63899508e28",
+    "tool_receipts": [
+      "4e418775-1e00-409d-8f2d-74739f9de9f2",
+      "95d5835f-39c8-4443-aedc-835ad01598d0"
+    ],
+    "verified_behavior": [
+      "Genera 11 bloques orientativos con fuente y faltantes.",
+      "Pregunta por fabricación por terceros no confirmada.",
+      "Documento disponible se separa de contenido revisado; borrador deja de pedirlo y mantiene revisión.",
+      "Ninguna presentación ni aprobación SRS; fuentes locales completas pendientes."
+    ],
+    "gemini_initial": {
+      "job_id": "df21b905-11b1-41dd-971c-0f90c1366707",
+      "status": "failed",
+      "attempts": 3,
+      "reason": "Proveedor HTTP503 y timeout; ningún resultado inventado.",
+      "next": "Nueva práctica breve tras editar criterios; fallo de reutilización de requestId corregido y cubierto por regresión."
+    }
+  },
+  "ci": {
+    "run_id": 40214014010,
+    "url": "https://github.com/Rick2818/Fabrica-de-Agentes-IA/actions/runs/40214014010",
+    "conclusion": "success",
+    "commit": "be7ead2cd0cc3c58316092ae257c6a869275d7dc"
   }
 }
