@@ -1,7 +1,7 @@
 name: Fábrica de Agentes IA
 on:
   schedule:
-    - cron: '13,28,43,58 * * * *'
+    - cron: '13,28,35,43,58 * * * *'
   workflow_dispatch:
 permissions: {}
 concurrency:
