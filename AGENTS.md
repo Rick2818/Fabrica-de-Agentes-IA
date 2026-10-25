@@ -11,3 +11,9 @@ Respetar la preferencia de opciones gratuitas. No habilitar facturación, cambia
 Preservar el Site existente, sus datos y su audiencia. Antes de editar el runtime leer la configuración y pruebas. Construir desde web/ y worker/runtime.mjs con scripts/build.mjs; worker/index.js y dist/server/index.js son generados. Usar scripts/test-agent.mjs para cambios de servidor y validar el artefacto. No modificar Boltech ni otros proyectos.
 
 Repositorio principal del código: Rick2818/Fabrica-de-Agentes-IA. Guardar allí los cambios y su evidencia antes de reportarlos terminados. La publicación del Site existente es un paso separado; no sustituir su project_id ni su audiencia. No depender de Copilot.
+
+## Separación de proyectos — instrucción de Rick, 25-10-2026
+
+Fábrica de Agentes IA es la plataforma que crea y entrena agentes. Boltech Group es un negocio distinto con su propio Agente 1, oferta, datos y ejecutores. No deducir que un vendedor de la Fábrica trabaja para Boltech. Antes de prospectar para un agente, debe existir asignación expresa de negocio y oferta; sin ella, modo entrenamiento y sin disparador comercial activo. No importar condiciones, contactos, credenciales ni campañas de otro proyecto.
+
+Un traspaso entre proyectos exige instrucción explícita y puntual del usuario, destino verificado y recibo de recepción. La autorización del 25-10 para una solicitud n8n 323862 es un traspaso único a AGENT1 de Boltech, no una integración permanente. Conservar en la Fábrica solo la constancia archivada del traspaso; no tratar esa oportunidad como propia ni afirmar procesamiento por haberla encolado.

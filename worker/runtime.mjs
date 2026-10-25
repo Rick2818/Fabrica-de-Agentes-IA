@@ -318,7 +318,12 @@ async function mcp(request,env){
   }
   else if(input.params?.name==='create_task'){
    const a=input.params.arguments||{};
-   if(a.title==='Fábrica: registrar ciclo comercial v1'){
+   if(a.title==='Fábrica: archivar traspaso autorizado v1'){
+    let payload;try{payload=JSON.parse(a.prompt)}catch{throw trainingError('Traspaso inválido.')}
+    if(!/^[a-f0-9]{64}$/.test(payload.opportunity_id)||!text(payload.destination,100)||!text(payload.receipt_id,200))throw trainingError('Falta el destino o el recibo real del traspaso.');
+    const key='commercial_opportunity:'+payload.opportunity_id,opportunity=await trainingGet(env.DB,key);if(!opportunity)throw trainingError('Oportunidad no encontrada.',404);
+    opportunity.archived=true;opportunity.stage='transferred';opportunity.transfer={destination:payload.destination,receipt_id:payload.receipt_id,mode:'explicit_user_one_time',at:new Date().toISOString()};await trainingSet(env.DB,key,opportunity);value={archived:true,transfer:opportunity.transfer};
+   }else if(a.title==='Fábrica: registrar ciclo comercial v1'){
     let payload;try{payload=JSON.parse(a.prompt)}catch{throw trainingError('Ciclo inválido.')}
     if(!text(payload.run_id,200)||!['completed','blocked'].includes(payload.outcome)||!Number.isSafeInteger(payload.checked_at)||!Number.isSafeInteger(payload.sources_reviewed)||payload.sources_reviewed<0||!text(payload.summary,1800))throw trainingError('Ciclo inválido.');
     const cycle={run_id:payload.run_id,outcome:payload.outcome,checked_at:payload.checked_at,sources_reviewed:payload.sources_reviewed,summary:payload.summary};await trainingSet(env.DB,'commercial_cycle',cycle);value={saved:true,cycle};
@@ -428,20 +433,23 @@ export async function evaluateTraining(db,p,a){
 export async function commercialBoard(db){
  const records=await rows(db,"SELECT value FROM settings WHERE key LIKE 'commercial_opportunity:%' ORDER BY key LIMIT 300");
  const opportunities=records.map(r=>{try{return JSON.parse(r.value)}catch{return null}}).filter(Boolean).sort((a,b)=>b.checked_at-a.checked_at);
- const schedule=await trainingGet(db,'commercial_schedule');
- return {opportunities,schedule,last_cycle:await trainingGet(db,'commercial_cycle'),capabilities:{public_discovery:'cloud_task',drafting:'cloud_task',direct_outreach:false,payment_verification:false},scope:'Detección de demanda pública, calificación preliminar y borradores. Contacto y cobro no conectados.'};
+ const schedule=await trainingGet(db,'commercial_schedule'),business=await trainingGet(db,'commercial_business');
+ return {opportunities:opportunities.filter(o=>!o.archived&&o.business_id===business?.business_id),archived_count:opportunities.filter(o=>o.archived).length,business_scope:business?.business_id||null,mode:business?.business_id&&business?.approved_offer?'assigned_business':'training_only',schedule,last_cycle:await trainingGet(db,'commercial_cycle'),capabilities:{public_discovery:business?.business_id&&schedule?.enabled?'scheduled_cloud_task':'not_enabled',drafting:'native_writer',direct_outreach:false,payment_verification:false},scope:'Detección de demanda pública, calificación preliminar y borradores. Contacto y cobro no conectados.'};
 }
 export async function recordOpportunity(db,a,now=Date.now()){
+ const business=await trainingGet(db,'commercial_business');
+ if(!business?.business_id||!text(business.approved_offer,4000)||a?.business_id!==business.business_id)throw trainingError('Asigná expresamente el negocio y su oferta antes de registrar demanda real. La Fábrica no es un vendedor de otro proyecto.',409);
  if(!a||a.intent!=='buyer_request'||!text(a.title,160)||!text(a.signal,1800)||!text(a.fit,1200)||!text(a.next_action,1200)||!Number.isSafeInteger(a.checked_at)||a.checked_at>now+300000||a.checked_at<now-48*3600000)throw trainingError('Falta una solicitud de compra, fuente revisada o siguiente acción.');
  let url;try{url=new URL(a.source_url)}catch{throw trainingError('Fuente inválida.')}
  if(url.protocol!=='https:'||url.username||url.password||url.href.length>2000)throw trainingError('Usá un enlace público HTTPS sin credenciales.');
  url.hash='';for(const k of [...url.searchParams.keys()])if(k.startsWith('utm_')||k==='tl')url.searchParams.delete(k);
  const canonical=url.href.replace(/\/$/,'');
- const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(canonical));const id=Array.from(new Uint8Array(bytes)).map(x=>x.toString(16).padStart(2,'0')).join('');
+ const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(business.business_id+'|'+canonical));const id=Array.from(new Uint8Array(bytes)).map(x=>x.toString(16).padStart(2,'0')).join('');
  const key='commercial_opportunity:'+id,previous=await trainingGet(db,key);
  const count=await first(db,"SELECT count(*) AS n FROM settings WHERE key LIKE 'commercial_opportunity:%'");if(!previous&&count.n>=300)throw trainingError('El registro llegó a 300 oportunidades. Revisá el archivo antes de ampliar.',409);
  const draft=typeof a.draft==='string'?a.draft.slice(0,3500):previous?.draft||'';
- const opportunity={id,title:a.title,source_url:canonical,signal:a.signal,fit:a.fit,market:typeof a.market==='string'?a.market.slice(0,100):'No indicado',published_at:typeof a.published_at==='string'?a.published_at.slice(0,35):null,source_status:['accepting_applications','needs_review','closed'].includes(a.source_status)?a.source_status:'needs_review',next_action:a.next_action,draft,stage:a.source_status==='closed'?'closed':draft?'draft_ready':'detected',first_seen:previous?.first_seen||now,checked_at:a.checked_at,receipt:{source:'native-research',verified_by:'writer-declared-public-page-read',saved_at:now,no_model_generation:true},outreach:'not_sent',payment:'not_verified'};
+ if(previous?.archived)throw trainingError('Esta oportunidad salió de la Fábrica mediante un traspaso autorizado; no se reactiva automáticamente.',409);
+ const opportunity={id,business_id:business.business_id,title:a.title,source_url:canonical,signal:a.signal,fit:a.fit,market:typeof a.market==='string'?a.market.slice(0,100):'No indicado',published_at:typeof a.published_at==='string'?a.published_at.slice(0,35):null,source_status:['accepting_applications','needs_review','closed'].includes(a.source_status)?a.source_status:'needs_review',next_action:a.next_action,draft,stage:a.source_status==='closed'?'closed':draft?'draft_ready':'detected',first_seen:previous?.first_seen||now,checked_at:a.checked_at,receipt:{source:'native-research',verified_by:'writer-declared-public-page-read',saved_at:now,no_model_generation:true},outreach:'not_sent',payment:'not_verified'};
  await trainingSet(db,key,opportunity);return {...opportunity,deduplicated:!!previous};
 }
 export default {async fetch(request,env,ctx){
