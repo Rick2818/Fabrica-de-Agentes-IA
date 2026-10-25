@@ -62,8 +62,10 @@ Repositorio del proyecto: https://github.com/Rick2818/Fabrica-de-Agentes-IA . Cr
 
 La bandeja de avisos conserva entregas, bloqueos y acuses de lectura. El ejecutor y un supervisor independientes del navegador registran ciclos y comprueban interrupciones. Abrir la página ya no ejecuta la cola automáticamente. Consultar [CONTINUIDAD.md](CONTINUIDAD.md) para controles, evidencia y límites. La validación local consta de 39 pruebas del servidor y 7 del ejecutor; la comprobación de ciclos reales permanece documentada por separado.
 
-Estado operativo al iniciar la revisión legal: el ejecutor de ChatGPT está pausado; el supervisor separado se archivó por el cupo de tareas de ChatGPT. Esto no limita la creación de workflows de GitHub Actions. El runner de GitHub está habilitado para revisar cada 15 minutos; su prueba manual de conexión fue exitosa. Ver CONTINUIDAD.md para la evidencia y el límite pendiente.
+Estado operativo al iniciar la revisión legal: el ejecutor de ChatGPT está pausado; el supervisor se reutilizó para vigilar GitHub, tras liberar el cupo del ejecutor anterior. Esto no limita la creación de workflows de GitHub Actions. El runner de GitHub está habilitado para revisar cada 15 minutos; su prueba manual de conexión fue exitosa. Ver CONTINUIDAD.md para la evidencia y el límite pendiente.
 
 ## Contexto de los encargos directos
 
 Los encargos directos nuevos usan solo su texto por defecto. La opción «Usar también memoria guardada» incorpora notas y resultados recientes. El chat, los objetivos y los trabajos anteriores conservan su funcionamiento previo. Esta minimización no detecta ni elimina información personal que se escriba dentro del encargo; sigue vigente la restricción sobre datos personales/confidenciales al proveedor gratuito.
+
+Estado de comprobación al 24-10-2026, 18:11 America/El_Salvador: no se ha observado todavía un evento schedule de GitHub. El encargo ficticio de prueba permanece queued, sin intentos. La conexión manual está verificada; la ejecución automática sigue pendiente de evidencia.

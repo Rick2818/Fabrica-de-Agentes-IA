@@ -73,3 +73,9 @@ Al registrar esta evidencia, el primer evento schedule y una entrega procesada p
 Se reutiliza la programación 6add39eb78f48191a1f6c7dfea32ed45, ahora «Supervisar Fábrica de Agentes IA», con revisión horaria en America/El_Salvador. Su activación fue confirmada; su primera ejecución con estas instrucciones todavía debe observarse. Consulta GitHub y agent_status, contrasta identificadores reales y alerta ante fallos, ciclos atascados o ausencia de recibos programados por más de 90 minutos. Respeta la pausa del tablero y las cuotas. No puede certificar el estado enabled del workflow mediante el conector actual ni reparar permisos o credenciales. No reactiva el ejecutor antiguo ni crea tareas.
 
 Los avisos se preparan en ChatGPT y se conservan en la bandeja del MVP; no se acredita entrega de push ni lectura humana.
+
+## Prueba aislada en curso, 18:11 America/El_Salvador
+
+La versión 21 se publicó correctamente con la migración 0003_task_context. Treinta y nueve pruebas de servidor y siete de ejecutor pasaron. El encargo github-autonomia-aislada-20261024 se creó con context_mode=isolated, due_at=1792886700000 (18:05 local), sin envío de memoria guardada. Al comprobar a las 18:11 seguía queued, attempts=0. GitHub aún mostraba únicamente el workflow_dispatch 40144699221; no se acredita por ahora el evento schedule previsto para las 18:07 ni una entrega por ese disparador. El supervisor está habilitado, pero todavía no hay ejecución observada con las nuevas instrucciones.
+
+No se pulsó ejecutar ni se disparó manualmente el workflow para adelantar esta prueba. La versión publicada y la conexión manual están comprobadas; el retraso del primer disparo programado no permite certificar autonomía continua. El MVP queda disponible para revisión mientras se conserva la prueba pendiente.
