@@ -17,3 +17,7 @@ Repositorio principal del código: Rick2818/Fabrica-de-Agentes-IA. Guardar allí
 Fábrica de Agentes IA es la plataforma que crea y entrena agentes. Boltech Group es un negocio distinto con su propio Agente 1, oferta, datos y ejecutores. No deducir que un vendedor de la Fábrica trabaja para Boltech. Antes de prospectar para un agente, debe existir asignación expresa de negocio y oferta; sin ella, modo entrenamiento y sin disparador comercial activo. No importar condiciones, contactos, credenciales ni campañas de otro proyecto.
 
 Un traspaso entre proyectos exige instrucción explícita y puntual del usuario, destino verificado y recibo de recepción. La autorización del 25-10 para una solicitud n8n 323862 es un traspaso único a AGENT1 de Boltech, no una integración permanente. Conservar en la Fábrica solo la constancia archivada del traspaso; no tratar esa oportunidad como propia ni afirmar procesamiento por haberla encolado.
+
+## Alcance aclarado por Rick — 25-10-2026
+
+La etapa actual define y practica las habilidades del agente de ventas como especialidad reutilizable. No se le ha asignado ningún producto, servicio ni negocio. No activar prospección real, calendarios comerciales ni integraciones de contacto por el solo hecho de definir una habilidad. Buscar oportunidades es parte esencial de la definición; su ejecución se configura después con el producto/servicio, fuentes y permisos del agente concreto. La interfaz de especialización debe mostrar habilidades y prácticas, sin exigir crear un negocio para entrenar.
