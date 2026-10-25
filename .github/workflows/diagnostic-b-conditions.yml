@@ -1,0 +1,18 @@
+name: Diagnostic B - condiciones
+on:
+  schedule:
+    - cron: '2-59/5 * * * *'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  unconditional:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo "diagnostic=B baseline event=$GITHUB_EVENT_NAME"
+  production_condition:
+    if: ${{ vars.AGENT_RUNNER_ENABLED == 'true' && github.repository_id == '1432658222' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo "diagnostic=B condition_passed event=$GITHUB_EVENT_NAME"
