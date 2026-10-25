@@ -40,6 +40,7 @@ Requiere Node.js 24, incluida su biblioteca `node:sqlite`. No se instalan depend
 
 ```bash
 node scripts/test-agent.mjs
+node scripts/test-training-ui.mjs
 node scripts/build.mjs
 node scripts/validate-artifact.mjs
 ```
@@ -69,3 +70,9 @@ Estado operativo al iniciar la revisión legal: el ejecutor de ChatGPT está pau
 Los encargos directos nuevos usan solo su texto por defecto. La opción «Usar también memoria guardada» incorpora notas y resultados recientes. El chat, los objetivos y los trabajos anteriores conservan su funcionamiento previo. Esta minimización no detecta ni elimina información personal que se escriba dentro del encargo; sigue vigente la restricción sobre datos personales/confidenciales al proveedor gratuito.
 
 Estado de comprobación al 24-10-2026, 18:11 America/El_Salvador: no se ha observado todavía un evento schedule de GitHub. El encargo ficticio de prueba permanece queued, sin intentos. La conexión manual está verificada; la ejecución automática sigue pendiente de evidencia.
+
+## Centro de Especialización
+
+En `/entrenamiento.html`, cada práctica utiliza una ficha guardada y un identificador persistente. La respuesta de Gemini aparece en la ficha al terminar o al volver a abrirla. Los errores transitorios conservan el mismo trabajo para reintento.
+
+La revisión manual guarda un recibo con escenario, criterios, respuesta, huella de la ficha y evidencia del proveedor. El estado «Aprobado para el alcance probado» se limita a esa versión y a la redacción en simulación. Modificar conocimientos o criterios, o iniciar otra práctica, requiere nueva revisión. No habilita operaciones externas. Los recibos son descargables desde la ficha.

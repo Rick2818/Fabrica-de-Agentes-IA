@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import worker,{enqueue,board,runNext,quotaDay,nextQuotaReset,createObjective,controlObjective,runRecordedCycle,recordSchedulerCheck,acknowledgeNotifications,continuity} from '../worker/runtime.mjs';
+import worker,{enqueue,board,runNext,quotaDay,nextQuotaReset,createObjective,controlObjective,runRecordedCycle,recordSchedulerCheck,acknowledgeNotifications,continuity,startTrainingPractice,trainingPractice,evaluateTraining} from '../worker/runtime.mjs';
 class D1 {
  constructor(file=':memory:'){this.db=new DatabaseSync(file);}
  prepare(sql){const owner=this;return {args:[],bind(...args){this.args=args;return this;},async all(){return {results:owner.db.prepare(sql).all(...this.args)};},async first(){return owner.db.prepare(sql).get(...this.args)||null;},async run(){const r=owner.db.prepare(sql).run(...this.args);return {meta:{changes:Number(r.changes)}};}};}
@@ -76,6 +76,47 @@ await test('Perfiles extensos se guardan en nube sin alterar el limite general',
  const saved=await worker.fetch(req('/api/training/profiles',{profiles}),envLocal,ctx);assert.equal(saved.status,200,await saved.text());
  const loaded=await worker.fetch(new Request(origin+'/api/training/profiles',{headers:{'oai-authenticated-user-id':'test-user'}}),envLocal,ctx);assert.equal((await loaded.json()).profiles.length,12);
  const oversized=await worker.fetch(req('/api/notes',{title:'Prueba',content:'X'.repeat(71000)}),envLocal,ctx);assert.equal(oversized.status,413);
+});
+
+const trainingOrigin='https://training.example';
+function trainingHarness(specialty='Ventas'){
+ const local=new D1();local.db.exec(migration);
+ const p={id:'profile-'+crypto.randomUUID(),name:'QA '+specialty,specialty,mission:'Redactar sin acciones externas. No inventar información.',knowledge:'Solo información ficticia aprobada.',tools:'Sin herramientas conectadas.',scenario:'Faltan datos esenciales.',criteria:'Pedir los datos que faltan; no inventar.',answer:'',assessment:'pending',history:[]};
+ const e={DB:local};const ctx={waitUntil(){}};
+ const call=(path,body)=>worker.fetch(new Request(trainingOrigin+path,{method:body?'POST':'GET',headers:{origin:trainingOrigin,'oai-authenticated-user-id':'test-user'},...(body?{body:JSON.stringify(body)}:{})}),e,ctx);
+ return {local,p,call,async save(){const res=await call('/api/training/profiles',{profiles:[p]});assert.equal(res.status,200,await res.text())}};
+}
+for(const specialty of ['Ventas','Servicio al cliente','Mercadeo']){
+ await test(specialty+': respuesta enlazada y recibo completo se recuperan del almacenamiento',async()=>{
+  const h=trainingHarness(specialty);await h.save();const id=crypto.randomUUID();
+  const start=await h.call('/api/training/practice',{profile_id:h.p.id,request_id:id});assert.equal(start.status,202);assert.equal((await start.json()).job_id,id);
+  globalThis.fetch=async(url,options)=>{assert(options.body.includes(specialty));assert(!options.body.includes('NOTA-SECRETA'));return answer('Respuesta sintética del caso '+specialty)};
+  assert.equal((await runNext(h.local,env,Date.now()+1000)).status,'done');
+  const result=await (await h.call('/api/training/practice?profile_id='+h.p.id)).json();assert.equal(result.practice.answer,'Respuesta sintética del caso '+specialty);assert.equal(result.practice.approval,'pending');assert.equal(result.practice.evidence.http,200);
+  const reviewed=await h.call('/api/training/evaluate',{profile_id:h.p.id,job_id:id,assessment:'pass',feedback:'Revisión QA manual: cumple los criterios sintéticos.'});assert.equal(reviewed.status,200);const receipt=(await reviewed.json()).receipt;assert.equal(receipt.answer,result.practice.answer);assert.equal(receipt.criteria,h.p.criteria);assert.equal(receipt.evidence.sha256.length,64);assert.equal(receipt.review_method,'manual');
+  const reloaded=await (await h.call('/api/training/profiles')).json();assert.equal(reloaded.profiles[0].practice.approval,'approved');assert.equal(reloaded.profiles[0].practice.receipt.id,receipt.id);
+ });
+ await test(specialty+': datos faltantes conservan una respuesta pendiente de revisión',async()=>{
+  const h=trainingHarness(specialty);await h.save();await startTrainingPractice(h.local,h.p,crypto.randomUUID());globalThis.fetch=async()=>answer('Faltan datos: proporcioná modelo, contexto y requisitos.');await runNext(h.local,env,Date.now()+1000);const p=await trainingPractice(h.local,h.p);assert.match(p.answer,/Faltan datos/);assert.equal(p.approval,'pending');assert.equal(p.receipt,null);
+ });
+ const failure=specialty==='Ventas'?429:specialty==='Servicio al cliente'?503:'network';
+ await test(specialty+': recuperación de '+failure+' usa la misma práctica y un único resultado',async()=>{
+  const h=trainingHarness(specialty);await h.save();const job=await startTrainingPractice(h.local,h.p,crypto.randomUUID());let calls=0;globalThis.fetch=async()=>{calls++;if(failure==='network')throw new TypeError('Conexión interrumpida');return new Response(JSON.stringify({error:{}}),{status:failure})};
+  const failed=await runNext(h.local,env,Date.now()+1000);assert(['waiting','error'].includes(failed.status));let p=await trainingPractice(h.local,h.p);assert.equal(p.status,'waiting');assert.equal(p.answer,'');assert.equal(p.approval,'pending');
+  const dedupe=await startTrainingPractice(h.local,h.p,crypto.randomUUID());assert.equal(dedupe.id,job.id);
+  const rejected=await h.call('/api/training/evaluate',{profile_id:h.p.id,job_id:job.id,assessment:'pass',feedback:'No debe aprobar todavía'});assert.equal(rejected.status,409);
+  globalThis.fetch=async()=>{calls++;return answer('Respuesta recuperada sin duplicación.')};assert.equal((await runNext(h.local,env,p.next_attempt_at+1000)).status,'done');p=await trainingPractice(h.local,h.p);assert.equal(p.job_id,job.id);assert.equal(p.answer,'Respuesta recuperada sin duplicación.');assert.equal((await board(h.local)).jobs.length,1);assert.equal(calls,2);
+ });
+}
+await test('Una aprobación anterior no certifica cambios ni una nueva práctica',async()=>{
+ const h=trainingHarness();await h.save();let job=await startTrainingPractice(h.local,h.p,crypto.randomUUID());globalThis.fetch=async()=>answer('Respuesta aprobable.');await runNext(h.local,env,Date.now()+1000);await evaluateTraining(h.local,h.p,{job_id:job.id,assessment:'pass',feedback:'Revisión QA inicial'});h.p.criteria+=' Otro requisito.';await h.save();let p=await trainingPractice(h.local,h.p);assert.equal(p.stale,true);assert.equal(p.approval,'stale');assert.equal((await h.call('/api/training/evaluate',{profile_id:h.p.id,job_id:job.id,assessment:'pass',feedback:'Revisión vieja'})).status,409);job=await startTrainingPractice(h.local,h.p,crypto.randomUUID());p=await trainingPractice(h.local,h.p);assert.equal(p.approval,'pending');assert.equal(p.receipt,null);
+});
+await test('Perfiles y recibos no se cruzan; un pass enviado por cliente no acredita revisión',async()=>{
+ const h=trainingHarness();h.p.assessment='pass';await h.save();assert.equal((await (await h.call('/api/training/profiles')).json()).profiles[0].practice,null);const id=crypto.randomUUID();await startTrainingPractice(h.local,h.p,id);await assert.rejects(()=>startTrainingPractice(h.local,{...h.p,scenario:'Caso diferente'},id),{status:409});const stranger={...h.p,id:'unrelated-profile'};assert.equal(await trainingPractice(h.local,stranger),null);assert.equal((await h.call('/api/training/evaluate',{profile_id:h.p.id,job_id:id,assessment:'pass',feedback:'Falso'})).status,409);
+});
+await test('Práctica valida origen, sesión, perfil y tamaño; un error final permite reintento explícito',async()=>{
+ const h=trainingHarness();await h.save();assert.equal((await worker.fetch(new Request(trainingOrigin+'/api/training/practice?profile_id='+h.p.id),{DB:h.local})).status,401);assert.equal((await worker.fetch(new Request(trainingOrigin+'/api/training/practice',{method:'POST',headers:{'oai-authenticated-user-id':'test-user'},body:'{}'}),{DB:h.local})).status,403);assert.equal((await h.call('/api/training/practice',{profile_id:'missing-profile',request_id:crypto.randomUUID()})).status,404);
+ const job=await startTrainingPractice(h.local,h.p,crypto.randomUUID());globalThis.fetch=async()=>new Response('{}',{status:403});assert.equal((await runNext(h.local,env,Date.now()+1000)).status,'failed');assert.equal((await trainingPractice(h.local,h.p)).answer,'');assert.equal((await h.call('/api/retry',{id:job.id})).status,200);globalThis.fetch=async()=>answer('Recuperada tras corregir el proveedor.');assert.equal((await runNext(h.local,env,Date.now()+20000)).status,'done');assert.equal((await trainingPractice(h.local,h.p)).job_id,job.id);
 });
 globalThis.fetch=originalFetch;
 console.log(JSON.stringify({passed:checks.length,scope:'Local SQL real; Gemini simulado para fallos, cancelación y recuperación.',checks}));
