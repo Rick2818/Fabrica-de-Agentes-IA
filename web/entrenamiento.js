@@ -11,13 +11,24 @@ if(!data?.length)data=defaults.map(x=>({...x,id:uid(),history:[]}));
 let selected=data[0].id;
 const current=()=>data.find(x=>x.id===selected);
 function notice(t){$('status').textContent=t;}
-function persist(){try{localStorage.setItem(KEY,JSON.stringify(data));return true}catch{notice('No hay espacio o permiso para guardar en este navegador. Exportá tu perfil.');return false}}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(data));return true}catch{notice('No se pudo guardar la copia local.');return false}}
+async function cloudSave(){const res=await fetch('/api/training/profiles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profiles:data})});const result=await res.json();if(!res.ok)throw Error(result.error||'No se pudieron guardar los perfiles.');return result}
+async function cloudLoad(){try{const res=await fetch('/api/training/profiles',{cache:'no-store'});if(!res.ok)throw Error('No se pudo consultar la nube.');const result=await res.json();if(Array.isArray(result.profiles)&&result.profiles.length){data=result.profiles;selected=data[0].id;persist();render();notice('Perfiles recuperados desde la nube.')}else notice('Plantillas iniciales listas; guardalas para sincronizarlas en la nube.')}catch(e){notice('Modo local: '+e.message)}}
+async function cloudSync(){try{await cloudSave();notice('Perfiles guardados en la nube.')}catch(e){notice('La copia local se conserva. '+e.message)}}
 function render(){const box=$('profiles');box.replaceChildren();for(const p of data){const b=document.createElement('button');b.className='item'+(p.id===selected?' active':'');b.textContent=p.name+' · '+p.specialty;b.addEventListener('click',()=>{selected=p.id;render()});box.append(b)}const p=current();for(const f of fields)$(f).value=p?.[f]||'';renderResult()}
 function sync(){const p=current();if(!p)return;for(const f of fields)p[f]=$(f).value;}
 function renderResult(){const p=current(),out=$('result');out.replaceChildren();if(!p)return;const text=document.createElement('p');text.textContent='Última evaluación: '+({pass:'Aprobado manualmente; no certificado para producción',fail:'Necesita mejoras',pending:'Sin evaluar'}[p.assessment]||'Sin evaluar')+'. Registros: '+(p.history||[]).length;out.append(text)}
-$('new').onclick=()=>{sync();const p={id:uid(),name:'Nuevo agente',specialty:'Otra',mission:'',knowledge:'',tools:'',scenario:'',criteria:'',answer:'',assessment:'pending',history:[]};data.push(p);selected=p.id;persist();render();notice('Nuevo perfil creado.')};
-$('save').onclick=()=>{sync();if(!current().name.trim())return notice('Ingresá un nombre.');persist();render();notice('Ficha guardada en este navegador.')};
-$('evaluate').onclick=()=>{sync();const p=current();if(!p.scenario.trim()||!p.criteria.trim()||!p.answer.trim())return notice('Completá situación, criterios y respuesta para registrar la revisión.');p.history=p.history||[];p.history.push({at:new Date().toISOString(),scenario:p.scenario,criteria:p.criteria,answer:p.answer,result:p.assessment});persist();renderResult();notice('Evaluación manual registrada; todavía no es certificación automática.')};
-$('delete').onclick=()=>{if(data.length===1)return notice('Conservá al menos un perfil.');if(!confirm('¿Eliminar esta ficha y su historial local?'))return;data=data.filter(p=>p.id!==selected);selected=data[0].id;persist();render();notice('Perfil eliminado.')};
+$('new').onclick=()=>{sync();const p={id:uid(),name:'Nuevo agente',specialty:'Otra',mission:'',knowledge:'',tools:'',scenario:'',criteria:'',answer:'',assessment:'pending',history:[]};data.push(p);selected=p.id;persist();render();cloudSync()};
+$('save').onclick=async()=>{sync();if(!current().name.trim())return notice('Ingresá un nombre.');persist();render();await cloudSync()};
+$('evaluate').onclick=async()=>{sync();const p=current();if(!p.scenario.trim()||!p.criteria.trim()||!p.answer.trim())return notice('Completá situación, criterios y respuesta para registrar la revisión.');p.history=p.history||[];p.history.push({at:new Date().toISOString(),scenario:p.scenario,criteria:p.criteria,answer:p.answer,result:p.assessment});persist();renderResult();await cloudSync();notice('Evaluación registrada; no es certificación automática.')};
+$('delete').onclick=()=>{if(data.length===1)return notice('Conservá al menos un perfil.');if(!confirm('¿Eliminar esta ficha y su historial local?'))return;data=data.filter(p=>p.id!==selected);selected=data[0].id;persist();render();cloudSync()};
 $('export').onclick=()=>{sync();const blob=new Blob([JSON.stringify(current(),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='agente-especializado.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notice('Perfil exportado.')};
 render();
+cloudLoad();
+
+$('practice').onclick=async()=>{
+  sync();persist();const p=current();if(!p.mission.trim()||!p.scenario.trim()||!p.criteria.trim())return notice('Completá misión, escenario y criterios.');
+  $('practice').disabled=true;
+  try{const res=await fetch('/api/training/practice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile:p})});const data=await res.json();if(!res.ok)throw Error(data.error||'No se pudo iniciar la práctica');notice('Práctica solicitada. Consultá el resultado desde Mis tareas: '+data.job_id);}
+  catch(e){notice(e.message)}finally{$('practice').disabled=false}
+};
