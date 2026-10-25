@@ -45,7 +45,7 @@
     "scope": "Preparación de índice, prelista, solicitud de faltantes y clasificación por modalidad. Sin presentación a SRS.",
     "sources_reviewed": "2026-10-25",
     "guide_full_download": "Pendiente: sitio de descarga no accesible en esta revisión; no sustituir guía vigente por prelista",
-    "live_status": "MCP productivo verificado con recibo; expediente UI guardado y actualización de etiqueta comprobados.",
+    "live_status": "MCP y formulario productivos; expediente guardado/recuperado, etiqueta actualizada, respuesta real de Gemini en ficha y revisión acotada guardada.",
     "profile_id": "c87333e0-5637-4e35-9b1e-b63899508e28",
     "tool_receipts": [
       "4e418775-1e00-409d-8f2d-74739f9de9f2",
@@ -63,12 +63,41 @@
       "attempts": 3,
       "reason": "Proveedor HTTP503 y timeout; ningún resultado inventado.",
       "next": "Nueva práctica breve tras editar criterios; fallo de reutilización de requestId corregido y cubierto por regresión."
+    },
+    "gemini_final": {
+      "job_id": "49d6a529-4d94-4463-a93a-9d911dc05257",
+      "review_receipt": "11cb08c7-1661-4512-98c7-227e063999da",
+      "tool_receipt": "95d5835f-39c8-4443-aedc-835ad01598d0",
+      "http": 200,
+      "attempts": 1,
+      "model": "gemini-3.6-flash",
+      "sha256": "06d46add0734e2d7dba0efbf0b69caa7ca4ace3f3211d9b9c9ba92bb8c949606",
+      "characters": 1162,
+      "reviewer": "Asistente de IA; revisión explícita contra criterios sintéticos",
+      "assessment": "pass",
+      "scope": "Borrador breve y vínculo de herramienta a ficha; no validación regulatoria ni profesional.",
+      "verified": [
+        "Pregunta fabricación por terceros",
+        "Distingue etiqueta disponible de revisada",
+        "Prioriza fórmula, métodos/validación y estabilidad",
+        "Solicitud breve sin presentación ni aprobación inventada",
+        "Respuesta automática en ficha y recibo persistido"
+      ],
+      "recovery": "La práctica anterior conservó fallo503/timeout; esta nueva versión breve completó en un intento. No afirmar recuperación automática del trabajo anterior."
     }
   },
   "ci": {
-    "run_id": 40214014010,
-    "url": "https://github.com/Rick2818/Fabrica-de-Agentes-IA/actions/runs/40214014010",
+    "run_id": 40214579302,
+    "url": "https://github.com/Rick2818/Fabrica-de-Agentes-IA/actions/runs/40214579302",
     "conclusion": "success",
-    "commit": "be7ead2cd0cc3c58316092ae257c6a869275d7dc"
+    "commit": "c10973f2c6eae59ff2239dce20bd76d7564127d6"
+  },
+  "deployment": {
+    "version": 33,
+    "source_commit": "69d4ba62707dd6a9aadd997b81c87b79e50ef1f2",
+    "url": "https://agente-ricardo-revision-rick.glassybell1025.chatgpt.site",
+    "status": "succeeded",
+    "access": "custom; preservado"
   }
 }
+
