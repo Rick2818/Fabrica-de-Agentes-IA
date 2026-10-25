@@ -1,0 +1,20 @@
+name: Diagnostic C - actor y contexto
+on:
+  schedule:
+    - cron: '3-59/5 * * * *'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Registrar actor y rama
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          REF: ${{ github.ref }}
+          REPO_ID: ${{ github.repository_id }}
+        run: |
+          echo "diagnostic=C event=$EVENT_NAME actor=$ACTOR ref=$REF repository_id=$REPO_ID"
+          date -u +"UTC=%Y-%m-%dT%H:%M:%SZ"
