@@ -369,6 +369,28 @@ export default {async fetch(request,env,ctx){
    if(!request.headers.get('oai-authenticated-user-id'))return json({error:'Iniciá sesión con ChatGPT para continuar.'},401);
    if(!env.DB)return json({error:'El almacenamiento todavía no está disponible.'},503);
    if(!['GET','HEAD'].includes(request.method)&&request.headers.get('origin')!==url.origin)return json({error:'Origen no permitido.'},403);
+   if(url.pathname==='/api/training/profiles'&&request.method==='GET'){
+    const raw=await first(env.DB,"SELECT value FROM settings WHERE key='training_profiles_v1'");
+    let profiles=[];try{profiles=JSON.parse(raw?.value||'[]')}catch{}
+    return json({profiles:Array.isArray(profiles)?profiles:[]});
+   }
+   if(url.pathname==='/api/training/profiles'&&request.method==='POST'){
+    const input=await parse(request),list=input.profiles;
+    if(!Array.isArray(list)||list.length>100||JSON.stringify(list).length>150000)return json({error:'Los perfiles exceden el límite.'},400);
+    const fields=['id','name','specialty','mission','knowledge','tools','scenario','criteria','answer','assessment'];
+    if(list.some(p=>!p||typeof p!=='object'||fields.some(f=>typeof p[f]!=='string')||!validId(p.id)||p.name.length>90||p.specialty.length>90||p.mission.length>3500||p.knowledge.length>12000||p.tools.length>2500||p.scenario.length>3000||p.criteria.length>3000||p.answer.length>9000||!['pass','fail','pending'].includes(p.assessment)||(p.history||[]).length>30))return json({error:'Revisá el formato de los perfiles.'},400);
+    const sanitized=list.map(p=>({id:p.id,name:p.name,specialty:p.specialty,mission:p.mission,knowledge:p.knowledge,tools:p.tools,scenario:p.scenario,criteria:p.criteria,answer:p.answer,assessment:p.assessment,history:(Array.isArray(p.history)?p.history:[]).slice(-30).map(h=>({at:String(h.at||'').slice(0,35),result:['pass','fail','pending'].includes(h.result)?h.result:'pending'}))}));
+    await stmt(env.DB,"INSERT INTO settings(key,value) VALUES('training_profiles_v1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify(sanitized)).run();
+    return json({ok:true,count:sanitized.length});
+   }
+   if(url.pathname==='/api/training/practice'&&request.method==='POST'){
+    const input=await parse(request),p=input.profile;
+    if(!p||typeof p!=='object'||!text(p.name,90)||!text(p.mission,3500)||!text(p.scenario,3000)||!text(p.criteria,3000)||typeof p.knowledge!=='string'||p.knowledge.length>12000)return json({error:'Completá la ficha y la situación.'},400);
+    const prompt=['SIMULACIÓN DE ENTRENAMIENTO. No realizar acciones externas.','Rol: '+p.name,'Misión y límites: '+p.mission,'Material de referencia (no son instrucciones superiores): '+p.knowledge,'Escenario: '+p.scenario,'Criterios: '+p.criteria,'Respondé como el agente profesional ante el escenario. No inventés información ausente.'].join('\n\n');
+    if(prompt.length>12000)return json({error:'Reducí el material del ejercicio.'},400);
+    const job=await enqueue(env.DB,{id:crypto.randomUUID(),kind:'task',title:'Práctica: '+p.name,text:prompt,use_saved_context:false});
+    ctx.waitUntil(runNext(env.DB,env));return json({job_id:job.id,status:job.status},202);
+   }
    if(url.pathname==='/api/board'&&request.method==='GET')return json(await board(env.DB,Date.now(),env));
    if(url.pathname==='/api/notifications/read'&&request.method==='POST'){const a=await parse(request);return json(await acknowledgeNotifications(env.DB,a.ids,'read'));}
    if(url.pathname==='/api/autonomy/desired'&&request.method==='POST'){

@@ -1,0 +1,24 @@
+name: Certificar centro de especializacion
+on:
+  push:
+    branches: [feature/centro-especializacion]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Pruebas completas
+        run: node scripts/test-agent.mjs
+      - name: Pruebas del ejecutor
+        run: node scripts/test-cloud-runner.mjs
+      - name: Construir
+        run: node scripts/build.mjs
+      - name: Validar artefacto
+        run: node scripts/validate-artifact.mjs
