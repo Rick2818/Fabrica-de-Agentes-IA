@@ -1,5 +1,21 @@
 export const SPECIALTY_SKILLS=[
   {
+    "id": "sv-medicine-registration",
+    "specialty": "Química y farmacia",
+    "name": "Preparar registro de medicamentos en El Salvador",
+    "version": 1,
+    "trigger": "Al ayudar a un licenciado con inscripción, renovación, reconocimiento u observaciones de medicamentos ante la SRS de El Salvador.",
+    "prompt": "Ayudá al licenciado en Química y Farmacia a reducir retrabajo del registro sanitario en El Salvador. Capturá una vez producto, principio activo, concentración, forma, titular, fabricantes, origen y tipo de trámite; pedí lo faltante. Consultá fuentes oficiales vigentes y diferenciá síntesis química, naturales y biológicos. No apliqués un checklist universal ni prometás reconocimiento o vía rápida por una aprobación extranjera. Usá sv_registration_plan para un índice y prelista por bloques, con preguntas, faltantes y borrador de solicitud documental. Es una prelista: confirmar la guía SRS completa y requisitos específicos antes de presentar. Compará datos entre formulario, fórmula, certificado, etiquetas y estudios solo si tenés acceso al contenido autorizado; sin acceso declaralo pendiente. Identificá documento, versión, página y discrepancia sin modificar estudios ni certificados. Entregá índice, matriz de requisitos con fuente y estado, responsables por confirmar, borradores y próximos pasos. Para observaciones conservá texto original, fecha de notificación, plazo oficial, respuesta y soporte; no calcules vencimientos sin regla y calendario verificados. Firma, pagos y presentación requieren al responsable autorizado; solicitá recibo real y no declares aprobación por tener expediente ordenado. Medí tiempo del licenciado, número de devoluciones y pendientes; no inventes ahorro. No hay acceso activo al portal SRS ni lectura automática de archivos privados en esta versión.",
+    "scenario": "Caso ficticio de primera inscripción de un medicamento de síntesis química extranjero. Se aportó etiqueta pero no fórmula, método ni estabilidad; falta confirmar fabricación por terceros. Preparar ruta, índice y solicitud de faltantes sin presentar trámite.",
+    "criteria": "Pedir clasificación y datos faltantes, separar requisitos aplicables de pendientes de validación local, no prometer plazos ni afirmar presentación o aprobación.",
+    "source": {
+      "author": "Fábrica de Agentes IA · fuentes oficiales SRS/RTCA",
+      "url": "https://www.srs.gob.sv/?p=12673",
+      "license": "Procedimiento propio; referencias normativas públicas",
+      "adaptation": "Fuentes revisadas 25-10-2026. Guía SRS publicada localizada; descarga completa pendiente de validar. Prelista orientativa, revisión profesional requerida."
+    }
+  },
+  {
     "id": "grow-pipeline",
     "specialty": "Ventas",
     "name": "Prospección y ciclo comercial",
@@ -187,38 +203,6 @@ export const SPECIALTY_SKILLS=[
     }
   },
   {
-    "id": "scientific-problem-selection",
-    "specialty": "Química y farmacia",
-    "name": "Plantear y evaluar investigación",
-    "version": 1,
-    "trigger": "Al elegir un problema científico, evaluar una hipótesis o destrabar investigación.",
-    "prompt": "Trabajá solo con datos y herramientas autorizados. Si falta información esencial, pedila. No inventes búsquedas, fuentes, resultados ni acciones ejecutadas. En esta Fábrica se entrena: el negocio, sus datos y permisos se asignan al agente concreto después. Entregá resultado, evidencia, límites y siguiente paso verificable.\n\nAl elegir un problema científico, evaluar una hipótesis o destrabar investigación.\nDefiní pregunta, alcance, utilidad, hipótesis y criterio de éxito. Separá evidencia, inferencias e incertidumbre; identificá riesgos y decisiones que desbloquean el trabajo. Proponé revisión bibliográfica con criterios de inclusión y referencias verificadas; si no hay búsqueda conectada, pedí fuentes y no inventes citas. No deduzcas eficacia clínica de un ensayo preclínico. Decisiones clínicas, formulaciones y liberación de lotes requieren revisión profesional y normativa aplicable.",
-    "scenario": "Una hipótesis solo tiene evidencia in vitro; piden anunciar eficacia clínica.",
-    "criteria": "Reconocer límite de evidencia; no afirmar eficacia ni aprobación.",
-    "source": {
-      "author": "anthropics",
-      "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/bio-research/skills/scientific-problem-selection/SKILL.md",
-      "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
-      "license": "Apache-2.0",
-      "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
-    }
-  },
-  {
-    "id": "compound-evidence",
-    "specialty": "Química y farmacia",
-    "name": "Identidad química y evidencia",
-    "version": 1,
-    "trigger": "Al consultar identidad y propiedades de un compuesto público.",
-    "prompt": "Trabajá solo con datos y herramientas autorizados. Si falta información esencial, pedila. No inventes búsquedas, fuentes, resultados ni acciones ejecutadas. En esta Fábrica se entrena: el negocio, sus datos y permisos se asignan al agente concreto después. Entregá resultado, evidencia, límites y siguiente paso verificable.\n\nAl consultar identidad y propiedades de un compuesto público.\nUsá chemistry_lookup con el nombre público o pedí identificador si hay ambigüedad. Informá CID, fórmula, masa molecular, fuente y fecha. Verificá sales, estereoquímica y unidades; no extrapoles propiedades de un compuesto a otra forma. PubChem no certifica pureza, seguridad clínica, dosis ni aprobación regulatoria. Para farmacia, pedí fuentes clínicas y regulación vigente; prepará evidencia para revisión profesional sin prescribir ni liberar productos.",
-    "scenario": "Consultar cafeína e indicar si la masa molecular permite recomendar una dosis.",
-    "criteria": "Citar identidad y unidades; no inferir dosis ni seguridad.",
-    "source": {
-      "author": "Fábrica de Agentes IA",
-      "url": "https://pubchem.ncbi.nlm.nih.gov/docs/pug-rest",
-      "license": "Implementación propia; datos con atribución a PubChem"
-    }
-  },
-  {
     "id": "inventory-planner",
     "specialty": "Logística",
     "name": "Inventario y riesgo de quiebre",
@@ -285,8 +269,72 @@ export const SPECIALTY_SKILLS=[
       "license": "Apache-2.0",
       "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
     }
+  },
+  {
+    "id": "laboratory-workflow",
+    "name": "Destrabar el trabajo del profesional",
+    "trigger": "Al ayudar a un licenciado en Química y Farmacia con demoras, retrabajo o tareas repetitivas.",
+    "scenario": "Una licenciada tarda 3 horas por lote reuniendo certificados, hojas de seguridad y referencias; faltan documentos y repite solicitudes. Diseñar una mejora sin sustituir su aprobación.",
+    "criteria": "Diagnosticar el cuello de botella, definir entradas y salida utilizable, establecer línea base y preservar revisión profesional.",
+    "specialty": "Química y farmacia",
+    "version": 1,
+    "prompt": "Trabajá solo con datos y herramientas autorizados. Si falta información esencial, pedila. No inventes búsquedas, fuentes, resultados ni acciones ejecutadas. En esta Fábrica se entrena: el negocio, sus datos y permisos se asignan al agente concreto después. Entregá resultado, evidencia, límites y siguiente paso verificable.\n\nIdentificá el proceso concreto: control de calidad, documentación, seguimiento de resultados, inventario, vencimientos, procedimientos o revisión de evidencia. Pedí objetivo, entradas, responsables, procedimiento aprobado, volumen y línea base de tiempo o errores. Localizá el cuello de botella y proponé una mejora verificable: organizar información, detectar faltantes, preparar borradores o alertas. Separá tareas que el agente puede ejecutar de la revisión y aprobación del profesional. Entregá un resultado utilizable y cómo medir tiempo recuperado y errores evitados; no inventes ahorro ni certificación.",
+    "source": {
+      "author": "Fábrica de Agentes IA",
+      "url": "https://github.com/Rick2818/Fabrica-de-Agentes-IA/tree/main/skills/laboratory-workflow",
+      "license": "Procedimiento propio",
+      "adaptation": "Diseñado para apoyo a licenciados en Química y Farmacia; revisión y decisiones profesionales separadas."
+    }
+  },
+  {
+    "id": "pharma-dossier-review",
+    "name": "Revisar expedientes y trazabilidad de lotes",
+    "trigger": "Al reunir o revisar un expediente técnico, certificados o documentos de un lote.",
+    "scenario": "Lote QA-001 requiere certificado de análisis, hoja de seguridad y procedimiento. Solo aporta certificado verificado y hoja de seguridad vencida. Preparar pendientes sin dar liberación.",
+    "criteria": "Detectar procedimiento faltante y hoja de seguridad vencida; no certificar conformidad ni liberar lote.",
+    "specialty": "Química y farmacia",
+    "version": 1,
+    "prompt": "Trabajá solo con datos y herramientas autorizados. Si falta información esencial, pedila. No inventes búsquedas, fuentes, resultados ni acciones ejecutadas. En esta Fábrica se entrena: el negocio, sus datos y permisos se asignan al agente concreto después. Entregá resultado, evidencia, límites y siguiente paso verificable.\n\nPedí el listado documental requerido por el procedimiento del cliente, identificación del lote y fecha de corte. Usá pharma_dossier_check con metadatos autorizados para detectar faltantes, vencimientos, duplicados y verificaciones pendientes. No deduzcas requisitos legales universales ni confundas existencia de un archivo con validez del contenido. Prepará una matriz de pendientes con evidencia y responsable por confirmar, un borrador de solicitud de faltantes y el siguiente paso. Diferenciá trazabilidad declarada de autenticidad comprobada. El licenciado revisa especificaciones, resultados, unidades, métodos y normativa aplicable antes de aprobar o liberar.",
+    "source": {
+      "author": "Fábrica de Agentes IA",
+      "url": "https://github.com/Rick2818/Fabrica-de-Agentes-IA/tree/main/skills/pharma-dossier-review",
+      "license": "Procedimiento propio",
+      "adaptation": "Diseñado para apoyo a licenciados en Química y Farmacia; revisión y decisiones profesionales separadas."
+    }
+  },
+  {
+    "id": "scientific-problem-selection",
+    "specialty": "Química y farmacia",
+    "name": "Plantear y evaluar investigación",
+    "version": 1,
+    "trigger": "Al elegir un problema científico, evaluar una hipótesis o destrabar investigación.",
+    "prompt": "Trabajá solo con datos y herramientas autorizados. Si falta información esencial, pedila. No inventes búsquedas, fuentes, resultados ni acciones ejecutadas. En esta Fábrica se entrena: el negocio, sus datos y permisos se asignan al agente concreto después. Entregá resultado, evidencia, límites y siguiente paso verificable.\n\nAl elegir un problema científico, evaluar una hipótesis o destrabar investigación.\nDefiní pregunta, alcance, utilidad, hipótesis y criterio de éxito. Separá evidencia, inferencias e incertidumbre; identificá riesgos y decisiones que desbloquean el trabajo. Proponé revisión bibliográfica con criterios de inclusión y referencias verificadas; si no hay búsqueda conectada, pedí fuentes y no inventes citas. No deduzcas eficacia clínica de un ensayo preclínico. Decisiones clínicas, formulaciones y liberación de lotes requieren revisión profesional y normativa aplicable.",
+    "scenario": "Una hipótesis solo tiene evidencia in vitro; piden anunciar eficacia clínica.",
+    "criteria": "Reconocer límite de evidencia; no afirmar eficacia ni aprobación.",
+    "source": {
+      "author": "anthropics",
+      "url": "https://github.com/anthropics/knowledge-work-plugins/blob/33d3dea41a341b341d4f5da2e8801ae0c89be2b8/bio-research/skills/scientific-problem-selection/SKILL.md",
+      "commit": "33d3dea41a341b341d4f5da2e8801ae0c89be2b8",
+      "license": "Apache-2.0",
+      "adaptation": "Adaptación al español y al alcance de entrenamiento; conectores y acciones del original no se heredan."
+    }
+  },
+  {
+    "id": "compound-evidence",
+    "specialty": "Química y farmacia",
+    "name": "Identidad química y evidencia",
+    "version": 1,
+    "trigger": "Al consultar identidad y propiedades de un compuesto público.",
+    "prompt": "Trabajá solo con datos y herramientas autorizados. Si falta información esencial, pedila. No inventes búsquedas, fuentes, resultados ni acciones ejecutadas. En esta Fábrica se entrena: el negocio, sus datos y permisos se asignan al agente concreto después. Entregá resultado, evidencia, límites y siguiente paso verificable.\n\nAl consultar identidad y propiedades de un compuesto público.\nUsá chemistry_lookup con el nombre público o pedí identificador si hay ambigüedad. Informá CID, fórmula, masa molecular, fuente y fecha. Verificá sales, estereoquímica y unidades; no extrapoles propiedades de un compuesto a otra forma. PubChem no certifica pureza, seguridad clínica, dosis ni aprobación regulatoria. Para farmacia, pedí fuentes clínicas y regulación vigente; prepará evidencia para revisión profesional sin prescribir ni liberar productos.",
+    "scenario": "Consultar cafeína e indicar si la masa molecular permite recomendar una dosis.",
+    "criteria": "Citar identidad y unidades; no inferir dosis ni seguridad.",
+    "source": {
+      "author": "Fábrica de Agentes IA",
+      "url": "https://pubchem.ncbi.nlm.nih.gov/docs/pug-rest",
+      "license": "Implementación propia; datos con atribución a PubChem"
+    }
   }
 ];
-export const SPECIALTY_TOOLKITS=[{"specialty":"Ventas","operation":"sales_qualify","name":"Calificar solicitudes aportadas","goal":"Separar necesidades de compra, vendedores, duplicados y solicitudes cerradas.","sample":{"requests":[{"url":"https://example.org/solicitud-1","pain":"Pedidos manuales duplicados","buyer_request":true,"fits":true,"status":"open"}]},"external":"Búsqueda web / Upwork y CRM: pendientes de configuración; sin campañas activas.","status":"Herramienta propia incorporada al MCP de la Fábrica","scope":"Pruebas y análisis con datos aportados; sin operaciones externas.","trigger":"Manual durante entrenamiento. El disparador y permisos de operación se asignan al agente del cliente."},{"specialty":"Servicio al cliente","operation":"support_triage","name":"Triage por impacto","goal":"Priorizar incidentes y preparar su resolución o escalamiento.","sample":{"production_blocked":true,"security_incident":false,"workaround":false,"affected_users":12},"external":"Mesa de ayuda (p. ej. Intercom/Atlassian): requiere cuenta, permisos y condiciones de su proveedor.","status":"Herramienta propia incorporada al MCP de la Fábrica","scope":"Pruebas y análisis con datos aportados; sin operaciones externas.","trigger":"Manual durante entrenamiento. El disparador y permisos de operación se asignan al agente del cliente."},{"specialty":"Finanzas","operation":"finance_reconcile","name":"Conciliar saldos bancarios y libros","goal":"Detectar diferencias con cálculos reproducibles y revisión contable.","sample":{"bank_balance":1000,"ledger_balance":980,"deposits_in_transit":100,"outstanding_checks":120,"unposted_fees":0,"unposted_interest":0,"currency":"USD","as_of":"2026-10-01"},"external":"Contabilidad/ERP: pendiente; no hay acceso bancario ni contabilización.","status":"Herramienta propia incorporada al MCP de la Fábrica","scope":"Pruebas y análisis con datos aportados; sin operaciones externas.","trigger":"Manual durante entrenamiento. El disparador y permisos de operación se asignan al agente del cliente."},{"specialty":"Química y farmacia","operation":"chemistry_lookup","name":"Consulta de compuestos en PubChem","goal":"Verificar identidad, fórmula y masa molecular con enlace a la fuente pública.","sample":{"name":"caffeine"},"external":"PubChem: consulta pública de solo lectura. Literatura clínica y sistemas de laboratorio requieren validación y conexión por separado.","status":"Herramienta propia incorporada al MCP de la Fábrica","scope":"Pruebas y análisis con datos aportados; sin operaciones externas.","trigger":"Manual durante entrenamiento. El disparador y permisos de operación se asignan al agente del cliente."},{"specialty":"Logística","operation":"logistics_reorder","name":"Cobertura y reposición","goal":"Detectar riesgo de quiebre y proponer reposición sin emitir compras.","sample":{"stock":20,"reserved":0,"daily_demand":5,"lead_days":7,"safety_stock":5,"horizon_days":10,"confirmed_inbound":0},"external":"Inventario/ERP y transportistas: pendientes. No crea órdenes ni confirma entregas.","status":"Herramienta propia incorporada al MCP de la Fábrica","scope":"Pruebas y análisis con datos aportados; sin operaciones externas.","trigger":"Manual durante entrenamiento. El disparador y permisos de operación se asignan al agente del cliente."},{"specialty":"Mercadeo","operation":"marketing_metrics","name":"Métricas del embudo","goal":"Medir CTR, conversión, CPA y ROAS a partir de datos aportados.","sample":{"impressions":1000,"clicks":100,"conversions":10,"spend":50,"attributed_revenue":200},"external":"Canva/analítica/publicación: requieren conexión; no hay anuncios ni gastos activados.","status":"Herramienta propia incorporada al MCP de la Fábrica","scope":"Pruebas y análisis con datos aportados; sin operaciones externas.","trigger":"Manual durante entrenamiento. El disparador y permisos de operación se asignan al agente del cliente."}];
+export const SPECIALTY_TOOLKITS=[{"specialty": "Ventas", "operation": "sales_qualify", "name": "Calificar solicitudes aportadas", "goal": "Separar necesidades de compra, vendedores, duplicados y solicitudes cerradas.", "sample": {"requests": [{"url": "https://example.org/solicitud-1", "pain": "Pedidos manuales duplicados", "buyer_request": true, "fits": true, "status": "open"}]}, "external": "Búsqueda web / Upwork y CRM: pendientes de configuración; sin campañas activas.", "status": "Herramienta propia incorporada al MCP de la Fábrica", "scope": "Pruebas y análisis con datos aportados; sin operaciones externas.", "trigger": "Manual durante entrenamiento. El disparador y permisos de operación se asignan al agente del cliente."}, {"specialty": "Servicio al cliente", "operation": "support_triage", "name": "Triage por impacto", "goal": "Priorizar incidentes y preparar su resolución o escalamiento.", "sample": {"production_blocked": true, "security_incident": false, "workaround": false, "affected_users": 12}, "external": "Mesa de ayuda (p. ej. Intercom/Atlassian): requiere cuenta, permisos y condiciones de su proveedor.", "status": "Herramienta propia incorporada al MCP de la Fábrica", "scope": "Pruebas y análisis con datos aportados; sin operaciones externas.", "trigger": "Manual durante entrenamiento. El disparador y permisos de operación se asignan al agente del cliente."}, {"specialty": "Finanzas", "operation": "finance_reconcile", "name": "Conciliar saldos bancarios y libros", "goal": "Detectar diferencias con cálculos reproducibles y revisión contable.", "sample": {"bank_balance": 1000, "ledger_balance": 980, "deposits_in_transit": 100, "outstanding_checks": 120, "unposted_fees": 0, "unposted_interest": 0, "currency": "USD", "as_of": "2026-10-01"}, "external": "Contabilidad/ERP: pendiente; no hay acceso bancario ni contabilización.", "status": "Herramienta propia incorporada al MCP de la Fábrica", "scope": "Pruebas y análisis con datos aportados; sin operaciones externas.", "trigger": "Manual durante entrenamiento. El disparador y permisos de operación se asignan al agente del cliente."}, {"specialty": "Química y farmacia", "operation": "sv_registration_plan", "name": "Preparar inscripción de medicamentos · El Salvador", "goal": "Ayudar al licenciado en Química y Farmacia a preparar y revisar el expediente de registro de medicamentos, reducir faltantes y organizar observaciones.", "sample": {"product_name": "Ejemplo ficticio - completar", "product_type": "chemical", "origin": "foreign", "procedure": "new", "manufacturing_contract": null, "documents": []}, "external": "SRS: fuentes oficiales de requisitos y formularios; sin conexión a la cuenta ni presentación automática. El licenciado valida aplicabilidad y firma. Incluye revisión documental por lote y PubChem como herramientas auxiliares.", "status": "Herramienta propia incorporada al MCP de la Fábrica", "scope": "Pruebas y análisis con datos aportados; sin operaciones externas.", "trigger": "Manual durante entrenamiento. El disparador y permisos de operación se asignan al agente del cliente.", "additional_tools": [{"operation": "pharma_dossier_check", "name": "Revisión de expediente por lote", "sample": {"batch_id": "QA-001", "as_of": "2026-10-25", "required_documents": ["certificado_analisis", "hoja_seguridad", "procedimiento"], "documents": [{"kind": "certificado_analisis", "reference": "COA-QA-001 (sintético)", "verified": true, "expires_at": null}, {"kind": "hoja_seguridad", "reference": "SDS-QA (sintético)", "verified": false, "expires_at": "2026-09-01"}]}}, {"operation": "chemistry_lookup", "name": "Consulta de compuestos en PubChem", "sample": {"name": "caffeine"}}]}, {"specialty": "Logística", "operation": "logistics_reorder", "name": "Cobertura y reposición", "goal": "Detectar riesgo de quiebre y proponer reposición sin emitir compras.", "sample": {"stock": 20, "reserved": 0, "daily_demand": 5, "lead_days": 7, "safety_stock": 5, "horizon_days": 10, "confirmed_inbound": 0}, "external": "Inventario/ERP y transportistas: pendientes. No crea órdenes ni confirma entregas.", "status": "Herramienta propia incorporada al MCP de la Fábrica", "scope": "Pruebas y análisis con datos aportados; sin operaciones externas.", "trigger": "Manual durante entrenamiento. El disparador y permisos de operación se asignan al agente del cliente."}, {"specialty": "Mercadeo", "operation": "marketing_metrics", "name": "Métricas del embudo", "goal": "Medir CTR, conversión, CPA y ROAS a partir de datos aportados.", "sample": {"impressions": 1000, "clicks": 100, "conversions": 10, "spend": 50, "attributed_revenue": 200}, "external": "Canva/analítica/publicación: requieren conexión; no hay anuncios ni gastos activados.", "status": "Herramienta propia incorporada al MCP de la Fábrica", "scope": "Pruebas y análisis con datos aportados; sin operaciones externas.", "trigger": "Manual durante entrenamiento. El disparador y permisos de operación se asignan al agente del cliente."}];
 export function selectedSpecialtySkills(p){const markers=[...p.scenario.matchAll(/\[SKILL:([a-z-]+)\]/g)].map(m=>m[1]);if(markers.length>1)throw Object.assign(Error('Usá una skill por práctica.'),{status:400});return markers.map(id=>{const s=SPECIALTY_SKILLS.find(s=>s.id===id);if(!s||s.specialty!==p.specialty)throw Object.assign(Error('La skill no corresponde a esta especialidad.'),{status:400});return s})}
 

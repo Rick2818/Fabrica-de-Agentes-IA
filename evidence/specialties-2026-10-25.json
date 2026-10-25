@@ -2,16 +2,16 @@
   "date": "2026-10-25",
   "scope": "Fábrica de Agentes IA; especialidades reutilizables sin negocio asignado",
   "local_tests": {
-    "server": 95,
+    "server": 102,
     "runner": 7,
     "ui": 5,
-    "total": 107,
+    "total": 114,
     "model": "simulado",
     "database": "SQLite real"
   },
-  "skills": 17,
+  "skills": 20,
   "specialties": 6,
-  "mcp_operations": 6,
+  "mcp_operations": 8,
   "forward_test": {
     "cases": 4,
     "scope": "Aplicación independiente de conciliación, reposición, evidencia química y escalamiento sobre datos sintéticos.",
@@ -21,8 +21,28 @@
     "Conectores privados no heredados de ChatGPT",
     "Sin campaña, compra, contabilización, prescripción ni publicación automática",
     "Gemini no llama herramientas por sí solo; consume el recibo ejecutado desde ficha",
-    "Consulta PubChem pendiente de comprobación productiva",
     "Ningún perfil nuevo recibe aprobación operativa"
   ],
-  "provenance": "third-party/skill-provenance.json"
+  "provenance": "third-party/skill-provenance.json",
+  "live_mcp": {
+    "sales_qualify": "0e3772d9-df37-436c-acce-00d905d97b50",
+    "support_triage": "ca63fb3c-a027-4e8a-9942-46e5a0115b35",
+    "finance_reconcile": "26bd4fa8-8f23-44a9-91de-d9926b759033",
+    "logistics_reorder": "8fa43b3c-3a1b-4076-b521-fe241560e397",
+    "marketing_metrics": "26f27166-99e2-46eb-ad8c-cf3bea64596a",
+    "chemistry_lookup": "cda188e7-6f28-468b-9a7f-c109a6d4e798"
+  },
+  "live_pharma_ui": {
+    "profile_id": "c10ba475-d370-47a2-9afa-38c870983e12",
+    "tool_receipt": "492c72bd-bcba-41c9-9590-c2d6c33004a8",
+    "result": "PubChem CID2519, C8H10N4O2, 194.19g/mol; sin recomendación clínica",
+    "fix": "Redirección manual compatible con runtime; fallo controlado sin resultado inventado",
+    "scope": "Consulta y vínculo a ficha; no certificación de toda la profesión"
+  },
+  "registration": {
+    "scope": "Preparación de índice, prelista, solicitud de faltantes y clasificación por modalidad. Sin presentación a SRS.",
+    "sources_reviewed": "2026-10-25",
+    "guide_full_download": "Pendiente: sitio de descarga no accesible en esta revisión; no sustituir guía vigente por prelista",
+    "live_status": "Pendiente de prueba productiva de nueva operación"
+  }
 }

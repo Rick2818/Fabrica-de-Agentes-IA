@@ -6,7 +6,7 @@ const assets=Object.fromEntries(['index.html','style.css','app.js','entrenamient
 let runtime=readFileSync(resolve(root,'worker/runtime.mjs'),'utf8');
 for(const [file,names] of [['sales-prospecting',['SALES_PROSPECTING_SKILL']],['specialty-skills',['SPECIALTY_SKILLS','selectedSpecialtySkills','SPECIALTY_TOOLKITS']],['specialist-tools',['specialistTool','SPECIALIST_OPERATIONS']]]){
  const imported=new RegExp("import \\{[^}]+\\} from '\\./"+file+"\\.mjs';");
- runtime=runtime.replace(imported,()=>readFileSync(resolve(root,'worker',file+'.mjs'),'utf8').replace(/export (const|async function|function) /g,'$1 '));
+ runtime=runtime.replace(imported,()=>readFileSync(resolve(root,'worker',file+'.mjs'),'utf8').replace("import {planSVRegistration} from './sv-registration.mjs';",readFileSync(resolve(root,'worker/sv-registration.mjs'),'utf8')).replace(/export (const|async function|function) /g,'$1 '));
 }
 const source='const assets='+JSON.stringify(assets)+';\n'+runtime;
 writeFileSync(resolve(root,'worker/index.js'),source);

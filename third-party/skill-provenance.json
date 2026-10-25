@@ -1,6 +1,6 @@
 {
   "reviewed_on": "2026-10-25",
-  "scope": "17 procedimientos adaptados para entrenamiento. No instala ni hereda conexiones del plugin original.",
+  "scope": "20 procedimientos de apoyo por especialidad; registro farmacéutico salvadoreño en preparación, sin presentación ni aprobación.",
   "skills": [
     {
       "id": "grow-pipeline",
@@ -237,6 +237,45 @@
       },
       "original": "third-party/skills/performance-report.md",
       "adapted": "skills/performance-report/SKILL.md"
+    },
+    {
+      "id": "laboratory-workflow",
+      "specialty": "Química y farmacia",
+      "version": 1,
+      "source": {
+        "author": "Fábrica de Agentes IA",
+        "url": "https://github.com/Rick2818/Fabrica-de-Agentes-IA/tree/main/skills/laboratory-workflow",
+        "license": "Procedimiento propio",
+        "adaptation": "Diseñado para apoyo a licenciados en Química y Farmacia; revisión y decisiones profesionales separadas."
+      },
+      "original": null,
+      "adapted": "skills/laboratory-workflow/SKILL.md"
+    },
+    {
+      "id": "pharma-dossier-review",
+      "specialty": "Química y farmacia",
+      "version": 1,
+      "source": {
+        "author": "Fábrica de Agentes IA",
+        "url": "https://github.com/Rick2818/Fabrica-de-Agentes-IA/tree/main/skills/pharma-dossier-review",
+        "license": "Procedimiento propio",
+        "adaptation": "Diseñado para apoyo a licenciados en Química y Farmacia; revisión y decisiones profesionales separadas."
+      },
+      "original": null,
+      "adapted": "skills/pharma-dossier-review/SKILL.md"
+    },
+    {
+      "id": "sv-medicine-registration",
+      "specialty": "Química y farmacia",
+      "version": 1,
+      "source": {
+        "author": "Fábrica de Agentes IA · fuentes oficiales SRS/RTCA",
+        "url": "https://www.srs.gob.sv/?p=12673",
+        "license": "Procedimiento propio; referencias normativas públicas",
+        "adaptation": "Fuentes revisadas 25-10-2026. Guía SRS publicada localizada; descarga completa pendiente de validar. Prelista orientativa, revisión profesional requerida."
+      },
+      "original": null,
+      "adapted": "skills/sv-medicine-registration/SKILL.md"
     }
   ]
 }

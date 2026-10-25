@@ -1,12 +1,15 @@
+import {planSVRegistration} from './sv-registration.mjs';
 // Herramientas propias: cálculos reproducibles y consultas públicas de solo lectura.
-export const SPECIALIST_OPERATIONS=['sales_qualify','support_triage','finance_reconcile','logistics_reorder','marketing_metrics','chemistry_lookup'];
+export const SPECIALIST_OPERATIONS=['sales_qualify','support_triage','finance_reconcile','logistics_reorder','marketing_metrics','pharma_dossier_check','chemistry_lookup','sv_registration_plan'];
 function invalid(message){throw Object.assign(Error(message),{status:400})}
 function number(data,key,{positive=false,integer=false,signed=false}={}){const n=data[key];if(typeof n!=='number'||!Number.isFinite(n)||Math.abs(n)>1e12||(positive?n<=0:!signed&&n<0)||(integer&&!Number.isSafeInteger(n)))invalid('Revisá '+key);return n}
 const round=n=>Math.round((n+Number.EPSILON)*100)/100;
 export async function specialistTool(operation,data={}){
  if(!data||typeof data!=='object'||Array.isArray(data))invalid('Datos inválidos');
  let output,source='Datos proporcionados; sin lectura de sistemas del cliente.';
- if(operation==='sales_qualify'){
+ if(operation==='sv_registration_plan'){
+  output=planSVRegistration(data);source='Fuentes oficiales identificadas en output.sources; clasificación y metadatos aportados.';
+ }else if(operation==='sales_qualify'){
   if(!Array.isArray(data.requests)||data.requests.length>30)invalid('Aportá hasta 30 solicitudes.');
   const seen=new Set();output={requests:data.requests.map(r=>{
    let u;try{u=new URL(r.url)}catch{invalid('Fuente inválida.')}if(u.protocol!=='https:'||u.username||u.password||typeof r.pain!=='string'||!r.pain.trim()||r.pain.length>1000||typeof r.buyer_request!=='boolean'||typeof r.fits!=='boolean'||!['open','closed','unknown'].includes(r.status))invalid('Revisá evidencia y encaje de cada solicitud.');
@@ -32,10 +35,17 @@ export async function specialistTool(operation,data={}){
   const impressions=number(data,'impressions',{integer:true}),clicks=number(data,'clicks',{integer:true}),conversions=number(data,'conversions',{integer:true}),spend=number(data,'spend'),revenue=number(data,'attributed_revenue');
   if(clicks>impressions||conversions>clicks)invalid('Este embudo requiere conversiones ≤ clics ≤ impresiones.');
   output={ctr_percent:impressions?round(clicks/impressions*100):null,conversion_percent:clicks?round(conversions/clicks*100):null,cpa:conversions?round(spend/conversions):null,roas:spend?round(revenue/spend):null,next:'No confundir ingreso atribuido con causalidad ni ROAS con beneficio neto.'};
+ }else if(operation==='pharma_dossier_check'){
+  const date=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s;
+  if(typeof data.batch_id!=='string'||!data.batch_id.trim()||data.batch_id.length>80||!date(data.as_of)||!Array.isArray(data.required_documents)||!data.required_documents.length||data.required_documents.length>20||data.required_documents.some(s=>typeof s!=='string'||!s.trim()||s.length>80)||new Set(data.required_documents).size!==data.required_documents.length||!Array.isArray(data.documents)||data.documents.length>40)invalid('Indicá lote, fecha y lista de documentos requeridos por el procedimiento aprobado.');
+  const seen=new Set(),duplicates=[],expired=[],unverified=[];
+  for(const d of data.documents){if(!d||typeof d.kind!=='string'||!d.kind.trim()||d.kind.length>80||typeof d.reference!=='string'||!d.reference.trim()||d.reference.length>200||typeof d.verified!=='boolean'||(d.expires_at!==null&&!date(d.expires_at)))invalid('Cada documento requiere tipo, referencia, verificación declarada y fecha de vencimiento o null.');if(seen.has(d.kind))duplicates.push(d.kind);seen.add(d.kind);if(d.expires_at&&d.expires_at<data.as_of)expired.push(d.kind);if(!d.verified)unverified.push(d.kind);}
+  const missing=data.required_documents.filter(d=>!seen.has(d));
+  output={batch_id:data.batch_id,as_of:data.as_of,missing,expired:[...new Set(expired)],duplicates:[...new Set(duplicates)],unverified:[...new Set(unverified)],document_completeness_percent:round((data.required_documents.length-missing.length)/data.required_documents.length*100),review_status:missing.length||expired.length||duplicates.length||unverified.length?'Pendientes documentales detectados':'Sin pendientes estructurales en los metadatos aportados',next:'Preparar lista de faltantes y responsables por confirmar. Revisar contenido, especificaciones, vigencia y normativa con el licenciado responsable; esta comprobación no libera lotes ni certifica cumplimiento.',verification:'Metadatos y verificaciones declarados por quien aporta el expediente; no se han leído ni autenticado los documentos.'};
  }else if(operation==='chemistry_lookup'){
   if(typeof data.name!=='string'||!data.name.trim()||data.name.length>100||/[\x00-\x1f]/.test(data.name))invalid('Indicá un nombre de compuesto público (máximo 100 caracteres).');
   const url='https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/'+encodeURIComponent(data.name.trim())+'/property/MolecularFormula,MolecularWeight,IUPACName/JSON';
-  const response=await fetch(url,{signal:AbortSignal.timeout(10000),redirect:'error'});
+  let response;try{response=await fetch(url,{signal:AbortSignal.timeout(10000),redirect:'manual'})}catch(e){console.error('PubChem read failed:',String(e?.message||e).slice(0,250));throw Object.assign(Error('No se pudo consultar PubChem; consulta pendiente, podés reintentar.'),{status:503})}
   if(!response.ok)throw Object.assign(Error(response.status===404?'Compuesto no encontrado.':'PubChem no disponible; reintentá después.'),{status:response.status===404?404:503});
   const json=await response.json(),properties=json.PropertyTable?.Properties;if(!Array.isArray(properties)||!properties.length)throw Object.assign(Error('Respuesta de PubChem incompleta.'),{status:502});
   output={compounds:properties.slice(0,5).map(p=>({cid:p.CID,formula:p.MolecularFormula,molecular_weight_g_mol:p.MolecularWeight,iupac:p.IUPACName,url:'https://pubchem.ncbi.nlm.nih.gov/compound/'+p.CID})),scope:'Identidad y propiedades; no demuestra seguridad, indicación, dosis, pureza o aprobación de un medicamento.'};source=url;
