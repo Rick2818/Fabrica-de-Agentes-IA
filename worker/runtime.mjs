@@ -34,16 +34,19 @@ function validateOutput(o){
 }
 export async function enqueue(db,input,now=Date.now()){
  if(!validId(input.id)||!['task','chat'].includes(input.kind)||!text(input.text,12000))throw Object.assign(Error('Revisá el mensaje de la tarea.'),{status:400});
+ if(input.use_saved_context!=null&&typeof input.use_saved_context!=='boolean')throw Object.assign(Error('La opción de memoria es inválida.'),{status:400});
+ if(input.kind==='chat'&&input.use_saved_context===false)throw Object.assign(Error('Usá un encargo directo para trabajar sin memoria.'),{status:400});
+ const contextMode=input.kind==='chat'||input.use_saved_context===true?'saved':'isolated';
  const title=input.kind==='task'?(input.title||input.text.slice(0,100)):'Conversación';
  if(!text(title,160))throw Object.assign(Error('El título es demasiado largo.'),{status:400});
  const old=await first(db,'SELECT * FROM jobs WHERE id=?',input.id);
- if(old){if(old.kind!==input.kind||old.input!==input.text||old.title!==title)throw Object.assign(Error('Este identificador pertenece a otro encargo.'),{status:409});return old;}
+ if(old){if(old.kind!==input.kind||old.input!==input.text||old.title!==title||(input.use_saved_context!=null&&old.context_mode!==contextMode))throw Object.assign(Error('Este identificador pertenece a otro encargo.'),{status:409});return old;}
  const due=input.due_at==null?now:input.due_at;
  if(!Number.isSafeInteger(due)||due<now-60000||due>now+30*86400000)throw Object.assign(Error('Elegí una fecha dentro de los próximos 30 días.'),{status:400});
  if(input.kind==='chat'&&await first(db,"SELECT id FROM jobs WHERE kind='chat' AND status IN ('queued','waiting','running')"))throw Object.assign(Error('Esperá la respuesta anterior antes de enviar otro mensaje.'),{status:409});
  const count=await first(db,"SELECT count(*) AS n FROM jobs WHERE status IN ('queued','running','waiting')");
  if(count.n>=30)throw Object.assign(Error('Hay 30 encargos pendientes. Terminá o cancelá alguno antes de agregar más.'),{status:409});
- const batch=[stmt(db,'INSERT OR IGNORE INTO jobs(id,kind,title,input,due_at,next_attempt_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',input.id,input.kind,title,input.text,due,due,now,now)];
+ const batch=[stmt(db,'INSERT OR IGNORE INTO jobs(id,kind,title,input,due_at,next_attempt_at,created_at,updated_at,context_mode) VALUES(?,?,?,?,?,?,?,?,?)',input.id,input.kind,title,input.text,due,due,now,now,contextMode)];
  if(input.kind==='chat')batch.push(stmt(db,"INSERT OR IGNORE INTO messages(id,job_id,role,text,created_at) VALUES(?,?,'user',?,?)",input.id+'-user',input.id,input.text,now));
  await db.batch(batch);
  return first(db,'SELECT * FROM jobs WHERE id=?',input.id);
@@ -150,7 +153,8 @@ export async function runNext(db,env,now=Date.now()){
   if(!claimed)return {status:'cancelled',id:job.id};
   await stmt(db,'INSERT INTO usage(id,day,created_at) VALUES(?,?,?)',token,day(now),now).run();
   if(objective)await stmt(db,'UPDATE objectives SET api_calls=api_calls+1,updated_at=? WHERE id=?',now,objective.id).run();
-  const [notes,tasks,history]=await Promise.all([
+  const isolated=job.context_mode==='isolated';
+  const [notes,tasks,history]=isolated?[[],[],[]]:await Promise.all([
    rows(db,'SELECT title,content FROM notes ORDER BY updated_at DESC LIMIT 30'),
    rows(db,"SELECT title,status,result FROM jobs WHERE kind='task' ORDER BY created_at DESC LIMIT 12"),
    rows(db,'SELECT * FROM (SELECT * FROM messages WHERE created_at<=? ORDER BY created_at DESC,id DESC LIMIT 16) ORDER BY created_at,id',job.created_at)
@@ -158,7 +162,7 @@ export async function runNext(db,env,now=Date.now()){
   const context=JSON.stringify({notes,tasks}).slice(0,28000);
   let contents=job.kind==='chat'?history.map(m=>({role:m.role,parts:[{text:m.text}]})):[{role:'user',parts:[{text:'Ejecutá esta tarea y entregá su resultado completo. No creés otras tareas.\n'+job.input}]}];
   if(!contents.length)contents=[{role:'user',parts:[{text:job.input}]}];
-  let instruction=system,outputSchema=schema;
+  let instruction=isolated?'Sos un asistente de texto. Respondé en español breve y claro. Trabajá únicamente con el texto de este encargo. No tenés memoria ni herramientas externas. No inventés comprobaciones. Devolvé JSON con reply (el resultado completo), notes y tasks (listas vacías).':system,outputSchema=schema;
   if(objective){const prepared=await objectiveRequest(db,objective,job);instruction=prepared.instruction;contents=prepared.contents;outputSchema=prepared.schema;}
   // Use the already verified direct Google endpoint; never forward the key to the browser.
   const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent',{
@@ -183,7 +187,7 @@ export async function runNext(db,env,now=Date.now()){
   if(job.kind==='task'&&output.tasks.length)throw Error('La tarea devolvió otros encargos en lugar de un resultado.');
   const completed=Date.now();
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(output.reply)))).map(b=>b.toString(16).padStart(2,'0')).join('');
-  const evidence=JSON.stringify({provider:'Google',model:MODEL,http:200,completed_at:completed,sha256:digest,characters:output.reply.length,execution_source:env.RUN_SOURCE||'server'});
+  const evidence=JSON.stringify({provider:'Google',model:MODEL,http:200,completed_at:completed,sha256:digest,characters:output.reply.length,execution_source:env.RUN_SOURCE||'server',context_mode:job.context_mode||'saved'});
   const condition="EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running' AND lease_token=?)";
   const changes=[];
   if(objective)changes.push(...objectiveCompletion(db,objective,job,parsed,token,completed));
@@ -286,7 +290,7 @@ const toolList=[
  {name:'record_scheduler_check',description:'Guardar una comprobación real del programador obtenida con Automations. No activa ni certifica por sí misma una programación. Genera un aviso persistente ante pausa, fallo o acción requerida.',inputSchema:{type:'object',properties:{schedule_id:{type:'string'},is_enabled:{type:'boolean'},requires_user_action:{type:'boolean'},status:{type:'string',enum:['completed','in_progress','failed','no_update','unknown']},run_id:{type:'string'},started_at:{type:'integer'},completed_at:{type:'integer'}},required:['schedule_id','is_enabled','requires_user_action','status']}},
  {name:'acknowledge_notifications',description:'Registrar que se anunció un aviso en ChatGPT después de emitir su contenido. Este acuse no significa que Rick lo leyó. La lectura solo se confirma desde la bandeja del agente.',inputSchema:{type:'object',properties:{ids:{type:'array',items:{type:'string'}}},required:['ids']}},
  {name:'send_message',description:'Conversar con Fábrica de Agentes IA y guardar el intercambio. Reutilizar id para evitar duplicados.',inputSchema:{type:'object',properties:{id:{type:'string'},message:{type:'string'}},required:['id','message']}},
- {name:'create_task',description:'Guardar un encargo real y ejecutar el primer trabajo disponible. Reutilizar id para reintentos sin duplicar.',inputSchema:{type:'object',properties:{id:{type:'string'},title:{type:'string'},prompt:{type:'string'},due_at:{type:'integer'}},required:['id','title','prompt']}},
+ {name:'create_task',description:'Guardar un encargo directo; por defecto usa solo su texto, sin memoria guardada. use_saved_context=true incorpora memoria. Ejecuta el primer trabajo disponible y reutiliza id sin duplicar.',inputSchema:{type:'object',properties:{id:{type:'string'},title:{type:'string'},prompt:{type:'string'},due_at:{type:'integer'},use_saved_context:{type:'boolean'}},required:['id','title','prompt']}},
  {name:'save_note',description:'Guardar o actualizar una preferencia por su título en la memoria real de Fábrica de Agentes IA.',inputSchema:{type:'object',properties:{title:{type:'string'},content:{type:'string'}},required:['title','content']}},
  {name:'register_cloud_schedule',description:'Registrar en el tablero la programación en la nube, únicamente después de crearla o verificarla con Sites. No crea ni activa una tarea programada por sí misma.',inputSchema:{type:'object',properties:{id:{type:'string'},schedule:{type:'string'},enabled:{type:'boolean'},check:{type:'object',properties:{schedule_id:{type:'string'},is_enabled:{type:'boolean'},requires_user_action:{type:'boolean'},status:{type:'string'},run_id:{type:'string'},started_at:{type:'integer'},completed_at:{type:'integer'}}}},required:['id','schedule','enabled']}}
 ];
@@ -313,7 +317,7 @@ async function mcp(request,env){
    value={job,run:await runNext(env.DB,env),board:await board(env.DB,Date.now(),env)};
   }
   else if(input.params?.name==='create_task'){
-   const a=input.params.arguments||{};const job=await enqueue(env.DB,{id:a.id,kind:'task',title:a.title,text:a.prompt,...(a.due_at!=null?{due_at:a.due_at}:{})});
+   const a=input.params.arguments||{};const job=await enqueue(env.DB,{id:a.id,kind:'task',title:a.title,text:a.prompt,...(a.use_saved_context!=null?{use_saved_context:a.use_saved_context}:{}),...(a.due_at!=null?{due_at:a.due_at}:{})});
    value={job,run:await runNext(env.DB,env),board:await board(env.DB,Date.now(),env)};
   }
   else if(input.params?.name==='save_note'){

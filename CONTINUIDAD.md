@@ -54,7 +54,7 @@ Los avisos de entrega, bloqueo e interrupción están persistidos y disponibles 
 
 ## Preparación del reemplazo en GitHub
 
-Validación local: 37 pruebas del servidor con SQL real y 7 del ejecutor con HTTP simulado. Cubren contexto válido/inválido, pausa, identidad del ciclo, privacidad del recibo, límite de fases/llamadas, destino fijo, fechas y presupuesto de tiempo. El build y el artefacto ESM se validaron. Estas pruebas no certifican un workflow real.
+Validación local: 39 pruebas del servidor con SQL real y 7 del ejecutor con HTTP simulado. Cubren contexto válido/inválido, pausa, identidad del ciclo, privacidad del recibo, límite de fases/llamadas, destino fijo, fechas y presupuesto de tiempo. El build y el artefacto ESM se validaron. Estas pruebas no certifican un workflow real.
 
 Configuración autorizada y realizada: ambos secretos de Actions y variable AGENT_RUNNER_ENABLED=true. Se cruzó la ejecución manual 40144699221 con su recibo en el Site. No declarar recuperación independiente ni avisos push certificados. Los avisos del MVP se guardan en su bandeja; no se acredita lectura humana.
 

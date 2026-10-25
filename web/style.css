@@ -103,3 +103,5 @@ h1,.welcome h2,.brand>div,.companion-name,.eyebrow{background:var(--metal-text);
 nav button.selected{background:#1c1a15;border-color:#413720;box-shadow:inset 2px 0 #e9bf60}
 
 .notification{padding:24px 0;border-top:1px solid var(--line)}.notification p{color:var(--ink);font-size:14px}.notification.is-read h3{color:var(--muted)}#unread-count{margin-left:auto;width:auto;min-width:20px;font-size:11px;color:var(--gold-soft)}#cycle-list{padding:12px 0}.notification small{display:block}
+
+.memory-choice{display:flex;align-items:center;gap:.65rem}.memory-choice input[type=checkbox]{width:auto;accent-color:#d7af48}
