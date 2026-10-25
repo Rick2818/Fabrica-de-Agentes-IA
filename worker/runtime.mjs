@@ -202,8 +202,8 @@ export async function runNext(db,env,now=Date.now()){
   return {status:'error',id:job?.id||null};
  }finally{await stmt(db,'UPDATE runner_lock SET expires=? WHERE id=1 AND token=?',lockUntil,token).run();}
 }
-async function parse(request){
- const raw=await request.text();if(raw.length>70000)throw Object.assign(Error('El mensaje es demasiado largo.'),{status:413});
+async function parse(request,maxLength=70000){
+ const raw=await request.text();if(raw.length>maxLength)throw Object.assign(Error('El mensaje es demasiado largo.'),{status:413});
  try{return JSON.parse(raw)}catch{throw Object.assign(Error('Solicitud inválida.'),{status:400})}
 }
 const objectivePlanSchema={type:'object',properties:{steps:{type:'array',items:{type:'object',properties:{title:{type:'string'},prompt:{type:'string'}},required:['title','prompt']}},blocked_reason:{type:'string'}},required:['steps','blocked_reason']};
@@ -375,7 +375,7 @@ export default {async fetch(request,env,ctx){
     return json({profiles:Array.isArray(profiles)?profiles:[]});
    }
    if(url.pathname==='/api/training/profiles'&&request.method==='POST'){
-    const input=await parse(request),list=input.profiles;
+    const input=await parse(request,180000),list=input.profiles;
     if(!Array.isArray(list)||list.length>100||JSON.stringify(list).length>150000)return json({error:'Los perfiles exceden el límite.'},400);
     const fields=['id','name','specialty','mission','knowledge','tools','scenario','criteria','answer','assessment'];
     if(list.some(p=>!p||typeof p!=='object'||fields.some(f=>typeof p[f]!=='string')||!validId(p.id)||p.name.length>90||p.specialty.length>90||p.mission.length>3500||p.knowledge.length>12000||p.tools.length>2500||p.scenario.length>3000||p.criteria.length>3000||p.answer.length>9000||!['pass','fail','pending'].includes(p.assessment)||(p.history||[]).length>30))return json({error:'Revisá el formato de los perfiles.'},400);
