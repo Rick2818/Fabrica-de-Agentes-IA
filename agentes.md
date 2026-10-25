@@ -1,5 +1,7 @@
 # Capacidades y requisitos de los agentes
 
+> Expresión del agente: tres skills compartidas (habla, baile y canto sintético) y MCP de preparación. Voz y ejecución dependen de navegador activo; no hay ElevenLabs conectado ni canto natural verificado. Ver EXPRESSION.md.
+
 > Actualización 25-10-2026: el Centro de Especialización incorpora seis perfiles, 20 skills con procedencia y ocho operaciones analíticas del MCP propio. La respuesta de Gemini se enlaza a la ficha; los resultados de herramienta se incorporan mediante recibos del mismo perfil. 115 verificaciones locales pasan; ver SPECIALTIES.md y evidence/specialties-2026-10-25.json. El alcance continúa en entrenamiento; no hay aprobación operativa de las nuevas especialidades ni acceso heredado a sistemas de clientes.
 
 > Estado más reciente: GitHub está habilitado cada 15 minutos y la conexión manual se comprobó en el run 40144699221. La versión 21 añade encargos directos sin memoria por defecto. La prueba automática de una entrega está en curso; el historial siguiente conserva evidencia de etapas anteriores.

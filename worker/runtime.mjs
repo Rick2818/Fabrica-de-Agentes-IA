@@ -1,4 +1,5 @@
 import {SALES_PROSPECTING_SKILL} from './sales-prospecting.mjs';
+import {EXPRESSION_SKILLS,expressionScore} from './expression.mjs';
 import {SPECIALTY_SKILLS,selectedSpecialtySkills,SPECIALTY_TOOLKITS} from './specialty-skills.mjs';
 import {specialistTool,SPECIALIST_OPERATIONS} from './specialist-tools.mjs';
 const MODEL='gemini-3.6-flash';
@@ -285,6 +286,8 @@ function objectiveCompletion(db,o,job,output,token,now){
  return changes;
 }
 const toolList=[
+ {name:'expression_skills',description:'Consultar las skills compartidas de habla, baile y canto sintético. Se ejecutan en un navegador activo; ElevenLabs no está conectado.',inputSchema:{type:'object',properties:{}},annotations:{readOnlyHint:true}},
+ {name:'expression_score',description:'Preparar y guardar texto de voz o secuencia original para animación/canto sintético. Este MCP no reproduce audio ni mueve el avatar por sí solo.',inputSchema:{type:'object',properties:{mode:{type:'string',enum:['speech','dance','sing']},text:{type:'string',maxLength:400},tempo:{type:'integer',minimum:60,maximum:140}},required:['mode']}},
  {name:'specialty_skills',description:'Leer skills adaptadas de la Fábrica, procedencia y MCP por especialidad. No activa integraciones externas.',inputSchema:{type:'object',properties:{specialty:{type:'string'}}},annotations:{readOnlyHint:true}},
  {name:'specialist_tool',description:'Ejecutar una herramienta de especialidad y guardar recibo: triage, conciliación, reposición, métricas, expedientes farmacéuticos, preparación de registro en El Salvador o consulta pública PubChem. Solo análisis y lectura, sin enviar, comprar ni contabilizar. Consultar specialty_skills para el esquema y ejemplo.',inputSchema:{type:'object',properties:{operation:{type:'string',enum:SPECIALIST_OPERATIONS},data:{type:'object'}},required:['operation','data']}},
  {name:'create_objective',description:'Encargar un objetivo autónomo: planifica hasta tres pasos, los ejecuta y revisa la entrega. Solo redacción y análisis de datos proporcionados. Persiste el progreso y respeta cuotas gratuitas.',inputSchema:{type:'object',properties:{id:{type:'string'},title:{type:'string'},description:{type:'string'},criteria:{type:'string'},due_at:{type:'integer'}},required:['id','title','description','criteria']}},
@@ -307,7 +310,9 @@ async function mcp(request,env){
  else if(input.method==='tools/list')result={tools:toolList};
  else if(input.method==='tools/call'){
   if(!request.headers.get('oai-authenticated-user-id'))return json({jsonrpc:'2.0',id:input.id,error:{code:-32001,message:'Se requiere identidad.'}},401);
-  let value;if(input.params?.name==='specialty_skills'){const specialty=input.params.arguments?.specialty;value={skills:SPECIALTY_SKILLS.filter(s=>!specialty||s.specialty===specialty),toolkits:SPECIALTY_TOOLKITS.filter(s=>!specialty||s.specialty===specialty)}}
+  let value;if(input.params?.name==='expression_skills')value={skills:EXPRESSION_SKILLS,scope:'Habilidades compartidas; reproducción requiere interfaz activa.',elevenlabs:'Candidato evaluado, no conectado. Plan Free sin licencia comercial; Startup Grant sujeto a aprobación.'};
+  else if(input.params?.name==='expression_score')value=await saveExpression(env.DB,input.params.arguments||{});
+  else if(input.params?.name==='specialty_skills'){const specialty=input.params.arguments?.specialty;value={skills:SPECIALTY_SKILLS.filter(s=>!specialty||s.specialty===specialty),toolkits:SPECIALTY_TOOLKITS.filter(s=>!specialty||s.specialty===specialty),shared_skills:EXPRESSION_SKILLS}}
   else if(input.params?.name==='specialist_tool'){try{value=await runSpecialistTool(env.DB,input.params.arguments||{})}catch(e){return json({jsonrpc:'2.0',id:input.id,result:{isError:true,content:[{type:'text',text:e.status?e.message:'No se pudo completar la herramienta.'}]}})}}
   else if(input.params?.name==='agent_status')value=await board(env.DB,Date.now(),env);
   else if(input.params?.name==='create_objective')value={objective:await createObjective(env.DB,input.params.arguments||{}),run:await runNext(env.DB,env),board:await board(env.DB,Date.now(),env)};
@@ -464,6 +469,7 @@ export async function recordOpportunity(db,a,now=Date.now()){
  const opportunity={id,business_id:business.business_id,title:a.title,source_url:canonical,signal:a.signal,fit:a.fit,market:typeof a.market==='string'?a.market.slice(0,100):'No indicado',published_at:typeof a.published_at==='string'?a.published_at.slice(0,35):null,source_status:['accepting_applications','needs_review','closed'].includes(a.source_status)?a.source_status:'needs_review',next_action:a.next_action,draft,stage:a.source_status==='closed'?'closed':draft?'draft_ready':'detected',first_seen:previous?.first_seen||now,checked_at:a.checked_at,receipt:{source:'native-research',verified_by:'writer-declared-public-page-read',saved_at:now,no_model_generation:true},outreach:'not_sent',payment:'not_verified'};
  await trainingSet(db,key,opportunity);return {...opportunity,deduplicated:!!previous};
 }
+async function saveExpression(db,a){const score=expressionScore(a),id=crypto.randomUUID(),plan={id,score,at:new Date().toISOString(),playback:{status:'not_started',source:'prepared_only'}};await trainingSet(db,'expression_plan:'+id,plan);return plan}
 async function runSpecialistTool(db,a){
  const result=await specialistTool(a.operation,a.data);
  const receipt={id:crypto.randomUUID(),profile_id:a.profile_id||null,...result,scope:'Herramienta analítica; no certifica autonomía ni acceso a datos privados.'};
@@ -480,6 +486,15 @@ export default {async fetch(request,env,ctx){
    if(!env.DB)return json({error:'El almacenamiento todavía no está disponible.'},503);
    if(!['GET','HEAD'].includes(request.method)&&request.headers.get('origin')!==url.origin)return json({error:'Origen no permitido.'},403);
    if(url.pathname==='/api/opportunities'&&request.method==='GET')return json(await commercialBoard(env.DB));
+   if(url.pathname==='/api/expression/skills'&&request.method==='GET')return json({skills:EXPRESSION_SKILLS});
+   if(url.pathname==='/api/expression/score'&&request.method==='POST')return json(await saveExpression(env.DB,await parse(request)));
+   if(url.pathname==='/api/expression/playback'&&request.method==='POST'){
+    const a=await parse(request);if(!validId(a.plan_id)||!['started','completed','stopped','unsupported','failed'].includes(a.status)||typeof a.detail!=='string'||a.detail.length>300)throw trainingError('Evento de reproducción inválido.');
+    const key='expression_plan:'+a.plan_id,p=await trainingGet(env.DB,key);if(!p)throw trainingError('Plan no encontrado.',404);
+    if(p.playback.status!=='not_started'&&p.playback.status!=='started')return json({saved:false,playback:p.playback});
+    if(a.status==='completed'&&p.playback.status!=='started')throw trainingError('No se registró el inicio de reproducción.',409);
+    p.playback={status:a.status,detail:a.detail,at:new Date().toISOString(),source:'browser_reported',scope:'Evento declarado por la interfaz; no verifica audibilidad ni percepción humana.'};await trainingSet(env.DB,key,p);return json({saved:true,playback:p.playback});
+   }
    if(url.pathname==='/api/training/sales-skill'&&request.method==='GET')return json(SALES_PROSPECTING_SKILL);
    if(url.pathname==='/api/training/specialties'&&request.method==='GET')return json({skills:SPECIALTY_SKILLS,toolkits:SPECIALTY_TOOLKITS});
    if(url.pathname==='/api/training/specialist-tool'&&request.method==='POST'){

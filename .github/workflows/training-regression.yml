@@ -18,5 +18,6 @@ jobs:
       - run: node scripts/test-agent.mjs
       - run: node scripts/test-cloud-runner.mjs
       - run: node scripts/test-training-ui.mjs
+      - run: node scripts/test-expression.mjs
       - run: node scripts/build.mjs
       - run: node scripts/validate-artifact.mjs
