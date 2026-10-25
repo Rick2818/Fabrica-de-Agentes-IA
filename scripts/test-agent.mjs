@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import worker,{enqueue,board,runNext,quotaDay,nextQuotaReset,createObjective,controlObjective,runRecordedCycle,recordSchedulerCheck,acknowledgeNotifications,continuity,startTrainingPractice,trainingPractice,evaluateTraining} from '../worker/runtime.mjs';
+import worker,{enqueue,board,runNext,quotaDay,nextQuotaReset,createObjective,controlObjective,runRecordedCycle,recordSchedulerCheck,acknowledgeNotifications,continuity,startTrainingPractice,trainingPractice,evaluateTraining,recordOpportunity,commercialBoard} from '../worker/runtime.mjs';
 class D1 {
  constructor(file=':memory:'){this.db=new DatabaseSync(file);}
  prepare(sql){const owner=this;return {args:[],bind(...args){this.args=args;return this;},async all(){return {results:owner.db.prepare(sql).all(...this.args)};},async first(){return owner.db.prepare(sql).get(...this.args)||null;},async run(){const r=owner.db.prepare(sql).run(...this.args);return {meta:{changes:Number(r.changes)}};}};}
@@ -124,6 +124,14 @@ await test('Ventas incorpora cierre consultivo sin heredar oferta ni herramienta
 });
 await test('La consulta no ejecuta IA; el reintento requiere POST de la práctica vigente',async()=>{
  const h=trainingHarness();await h.save();const job=await startTrainingPractice(h.local,h.p,crypto.randomUUID());const res=await h.call('/api/training/advance',{profile_id:h.p.id,job_id:'otra-practica'});assert.equal(res.status,409);assert.equal((await h.call('/api/training/advance',{profile_id:h.p.id,job_id:job.id})).status,202);assert.equal((await trainingPractice(h.local,h.p)).status,'queued');
+});
+await test('Oportunidades deduplican por fuente y quedan fuera de memoria y cola Gemini',async()=>{
+ const h=trainingHarness();const a={title:'Solicitud de agente de soporte',intent:'buyer_request',source_url:'https://example.org/request?utm_source=demo',signal:'Solicitud pública de implementación de agente.',fit:'Encaje preliminar: automatización de consultas.',next_action:'Verificar alcance y preparar borrador.',checked_at:Date.now(),draft:'Borrador para revisión, sin enviar.'};
+ const one=await recordOpportunity(h.local,a);const two=await recordOpportunity(h.local,{...a,source_url:'https://example.org/request'});assert.equal(one.id,two.id);assert.equal(two.deduplicated,true);const b=await board(h.local);assert.equal(b.jobs.length,0);assert.equal(b.notes.length,0);assert.equal(b.commercial.opportunities.length,1);assert.equal(b.commercial.opportunities[0].stage,'draft_ready');assert.equal(b.commercial.opportunities[0].outreach,'not_sent');assert.equal(b.commercial.capabilities.direct_outreach,false);
+ await assert.rejects(()=>recordOpportunity(h.local,{...a,intent:'seller_ad'}),{status:400});await assert.rejects(()=>recordOpportunity(h.local,{...a,source_url:'javascript:alert(1)'}),{status:400});await assert.rejects(()=>recordOpportunity(h.local,{...a,checked_at:0}),{status:400});
+});
+await test('El escritor comercial MCP guarda sin generar ni inventar contacto o cobro',async()=>{
+ const h=trainingHarness();const payload={title:'Demanda pública ficticia QA',intent:'buyer_request',source_url:'https://example.org/buyer-qa',signal:'Necesitan un asistente de consultas.',fit:'Encaje por validar',next_action:'Verificar solicitud',checked_at:Date.now()};const req=new Request(trainingOrigin+'/mcp',{method:'POST',headers:{'oai-authenticated-user-id':'test-user','content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'create_task',arguments:{id:crypto.randomUUID(),title:'Fábrica: registrar oportunidad comercial v1',prompt:JSON.stringify(payload)}}})});let calls=0;globalThis.fetch=async()=>{calls++;throw Error('No debe invocar Gemini')};const res=await worker.fetch(req,{DB:h.local,...env});assert.equal(res.status,200);assert.equal(calls,0);assert.equal((await commercialBoard(h.local)).opportunities.length,1);assert.equal((await board(h.local)).jobs.length,0);
 });
 globalThis.fetch=originalFetch;
 console.log(JSON.stringify({passed:checks.length,scope:'Local SQL real; Gemini simulado para fallos, cancelación y recuperación.',checks}));

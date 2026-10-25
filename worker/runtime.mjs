@@ -108,7 +108,7 @@ export async function board(db,now=Date.now(),env={}){
  let cloud=null,last=null;try{cloud=JSON.parse(automation?.value||'null');last=JSON.parse(lastRun?.value||'null')}catch{}
  const receipt=await first(db,"SELECT value FROM settings WHERE key='cloud_runner_receipt'");
  const [notifications,autonomy]=await Promise.all([rows(db,'SELECT * FROM notifications ORDER BY created_at DESC,id DESC LIMIT 100'),continuity(db,now)]);
- return {jobs,messages,notes,objectives,updates,notifications,usage:{used:usage.n,limit:20},automation:cloud,model:MODEL,server_time:now,health:{configured:!!env.GOOGLE_GENERATIVE_AI_API_KEY,next_run_at:runner?.expires>now?runner.expires:null,last_run:last,cloud_runner:receipt?JSON.parse(receipt.value):null,autonomy}};
+ return {jobs,messages,notes,objectives,updates,notifications,commercial:await commercialBoard(db),usage:{used:usage.n,limit:20},automation:cloud,model:MODEL,server_time:now,health:{configured:!!env.GOOGLE_GENERATIVE_AI_API_KEY,next_run_at:runner?.expires>now?runner.expires:null,last_run:last,cloud_runner:receipt?JSON.parse(receipt.value):null,autonomy}};
 }
 export async function runRecordedCycle(db,env,a={},now=Date.now()){
  const scheduled=a.trigger==='scheduled';
@@ -317,8 +317,22 @@ async function mcp(request,env){
    value={job,run:await runNext(env.DB,env),board:await board(env.DB,Date.now(),env)};
   }
   else if(input.params?.name==='create_task'){
-   const a=input.params.arguments||{};const job=await enqueue(env.DB,{id:a.id,kind:'task',title:a.title,text:a.prompt,...(a.use_saved_context!=null?{use_saved_context:a.use_saved_context}:{}),...(a.due_at!=null?{due_at:a.due_at}:{})});
-   value={job,run:await runNext(env.DB,env),board:await board(env.DB,Date.now(),env)};
+   const a=input.params.arguments||{};
+   if(a.title==='Fábrica: registrar ciclo comercial v1'){
+    let payload;try{payload=JSON.parse(a.prompt)}catch{throw trainingError('Ciclo inválido.')}
+    if(!text(payload.run_id,200)||!['completed','blocked'].includes(payload.outcome)||!Number.isSafeInteger(payload.checked_at)||!Number.isSafeInteger(payload.sources_reviewed)||payload.sources_reviewed<0||!text(payload.summary,1800))throw trainingError('Ciclo inválido.');
+    const cycle={run_id:payload.run_id,outcome:payload.outcome,checked_at:payload.checked_at,sources_reviewed:payload.sources_reviewed,summary:payload.summary};await trainingSet(env.DB,'commercial_cycle',cycle);value={saved:true,cycle};
+   }else if(a.title==='Fábrica: registrar disparador comercial v1'){
+    let payload;try{payload=JSON.parse(a.prompt)}catch{throw trainingError('Programación inválida.')}
+    if(!text(payload.id,200)||typeof payload.enabled!=='boolean'||!text(payload.label,200))throw trainingError('Programación inválida.');
+    await trainingSet(env.DB,'commercial_schedule',{id:payload.id,enabled:payload.enabled,label:payload.label,checked_at:Date.now()});value={saved:true,commercial:await commercialBoard(env.DB)};
+   }else if(a.title==='Fábrica: registrar oportunidad comercial v1'){
+    let payload;try{payload=JSON.parse(a.prompt)}catch{throw trainingError('La oportunidad requiere JSON válido.')}
+    value={opportunity:await recordOpportunity(env.DB,payload),commercial:await commercialBoard(env.DB)};
+   }else{
+    const job=await enqueue(env.DB,{id:a.id,kind:'task',title:a.title,text:a.prompt,...(a.use_saved_context!=null?{use_saved_context:a.use_saved_context}:{}),...(a.due_at!=null?{due_at:a.due_at}:{})});
+    value={job,run:await runNext(env.DB,env),board:await board(env.DB,Date.now(),env)};
+   }
   }
   else if(input.params?.name==='save_note'){
    const a=input.params.arguments||{};if(!text(a.title,120)||!text(a.content,4000))throw Object.assign(Error('Nota inválida'),{status:400});
@@ -410,6 +424,26 @@ export async function evaluateTraining(db,p,a){
  await db.batch([stmt(db,'INSERT INTO settings(key,value) VALUES(?,?)','training_receipt:'+receipt.id,JSON.stringify(receipt)),stmt(db,'INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value','training_review:'+practice.job_id,JSON.stringify({receipt_id:receipt.id}))]);
  return receipt;
 }
+
+export async function commercialBoard(db){
+ const records=await rows(db,"SELECT value FROM settings WHERE key LIKE 'commercial_opportunity:%' ORDER BY key LIMIT 300");
+ const opportunities=records.map(r=>{try{return JSON.parse(r.value)}catch{return null}}).filter(Boolean).sort((a,b)=>b.checked_at-a.checked_at);
+ const schedule=await trainingGet(db,'commercial_schedule');
+ return {opportunities,schedule,last_cycle:await trainingGet(db,'commercial_cycle'),capabilities:{public_discovery:'cloud_task',drafting:'cloud_task',direct_outreach:false,payment_verification:false},scope:'Detección de demanda pública, calificación preliminar y borradores. Contacto y cobro no conectados.'};
+}
+export async function recordOpportunity(db,a,now=Date.now()){
+ if(!a||a.intent!=='buyer_request'||!text(a.title,160)||!text(a.signal,1800)||!text(a.fit,1200)||!text(a.next_action,1200)||!Number.isSafeInteger(a.checked_at)||a.checked_at>now+300000||a.checked_at<now-48*3600000)throw trainingError('Falta una solicitud de compra, fuente revisada o siguiente acción.');
+ let url;try{url=new URL(a.source_url)}catch{throw trainingError('Fuente inválida.')}
+ if(url.protocol!=='https:'||url.username||url.password||url.href.length>2000)throw trainingError('Usá un enlace público HTTPS sin credenciales.');
+ url.hash='';for(const k of [...url.searchParams.keys()])if(k.startsWith('utm_')||k==='tl')url.searchParams.delete(k);
+ const canonical=url.href.replace(/\/$/,'');
+ const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(canonical));const id=Array.from(new Uint8Array(bytes)).map(x=>x.toString(16).padStart(2,'0')).join('');
+ const key='commercial_opportunity:'+id,previous=await trainingGet(db,key);
+ const count=await first(db,"SELECT count(*) AS n FROM settings WHERE key LIKE 'commercial_opportunity:%'");if(!previous&&count.n>=300)throw trainingError('El registro llegó a 300 oportunidades. Revisá el archivo antes de ampliar.',409);
+ const draft=typeof a.draft==='string'?a.draft.slice(0,3500):previous?.draft||'';
+ const opportunity={id,title:a.title,source_url:canonical,signal:a.signal,fit:a.fit,market:typeof a.market==='string'?a.market.slice(0,100):'No indicado',published_at:typeof a.published_at==='string'?a.published_at.slice(0,35):null,source_status:['accepting_applications','needs_review','closed'].includes(a.source_status)?a.source_status:'needs_review',next_action:a.next_action,draft,stage:a.source_status==='closed'?'closed':draft?'draft_ready':'detected',first_seen:previous?.first_seen||now,checked_at:a.checked_at,receipt:{source:'native-research',verified_by:'writer-declared-public-page-read',saved_at:now,no_model_generation:true},outreach:'not_sent',payment:'not_verified'};
+ await trainingSet(db,key,opportunity);return {...opportunity,deduplicated:!!previous};
+}
 export default {async fetch(request,env,ctx){
  const url=new URL(request.url);
  try{
@@ -419,6 +453,7 @@ export default {async fetch(request,env,ctx){
    if(!request.headers.get('oai-authenticated-user-id'))return json({error:'Iniciá sesión con ChatGPT para continuar.'},401);
    if(!env.DB)return json({error:'El almacenamiento todavía no está disponible.'},503);
    if(!['GET','HEAD'].includes(request.method)&&request.headers.get('origin')!==url.origin)return json({error:'Origen no permitido.'},403);
+   if(url.pathname==='/api/opportunities'&&request.method==='GET')return json(await commercialBoard(env.DB));
    if(url.pathname==='/api/training/profiles'&&request.method==='GET'){
     const profiles=await trainingProfiles(env.DB);
     return json({profiles:await Promise.all(profiles.map(async p=>({...p,practice:await trainingPractice(env.DB,p)})))});
