@@ -14,6 +14,14 @@ Estado: definición y práctica. Rick aclaró que este agente todavía no tiene 
 
 La guía de cierre consultivo del servidor ya se incorpora a las prácticas con especialidad Ventas. Las fuentes, plugins y automatizaciones de esta tabla son requisitos de configuración posterior, no conexiones activas ni prueba de ventas.
 
+## Propuesta de valor definida por Rick
+
+Se venderá la oportunidad de ayudar a una persona con un dolor real en su trabajo: un cuello de botella que se pueda destrabar mediante un agente especialista. El agente será el medio para recuperar productividad, eficiencia y valor económico perdido por ese problema.
+
+El vendedor primero comprueba la necesidad, el flujo afectado y su impacto. Después relaciona especialidad con mejora concreta y propone un piloto medible. La línea base puede incluir tiempo por tarea, espera, errores, retrabajo, volumen y costos documentados. No atribuye pérdidas sin datos ni garantiza dinero recuperado. La persona debe poder contrastar el antes y el después.
+
+Esta instrucción está incorporada en el prompt del servidor para todas las prácticas de Ventas.
+
 ## Certificación de esta etapa
 
 Las aprobaciones se refieren a escenarios sintéticos y revisión manual del asistente. Las prácticas reales con Gemini probaron respuesta en ficha, criterios, evidencia y persistencia. La definición de una habilidad no equivale a su ejecución comercial autónoma.
