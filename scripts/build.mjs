@@ -2,7 +2,7 @@ import {readFileSync,mkdirSync,writeFileSync,rmSync,cpSync} from 'node:fs';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
-const assets=Object.fromEntries(['index.html','style.css','app.js'].map(name=>[name,readFileSync(resolve(root,'web',name),'utf8')]));
+const assets=Object.fromEntries(['index.html','style.css','app.js','entrenamiento.html','entrenamiento.css','entrenamiento.js'].map(name=>[name,readFileSync(resolve(root,'web',name),'utf8')]));
 const runtime=readFileSync(resolve(root,'worker/runtime.mjs'),'utf8');
 const source='const assets='+JSON.stringify(assets)+';\n'+runtime;
 writeFileSync(resolve(root,'worker/index.js'),source);
