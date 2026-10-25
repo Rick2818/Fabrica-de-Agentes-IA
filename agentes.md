@@ -97,3 +97,9 @@ Se prepara un endpoint privado para ejecutar únicamente pendientes existentes y
 ## Cambio de nombre solicitado por Rick
 
 El 24-10-2026 el proyecto y su repositorio pasaron a llamarse Fábrica de Agentes IA / Rick2818/Fabrica-de-Agentes-IA. Se conservaron el repositorio (id 1432658222), historial, Site, base de datos, credenciales y registros anteriores. Los identificadores históricos y la URL técnica del Site se mantienen para no romper accesos.
+
+## Personaje de la Fábrica
+
+Mascota original con orejas, cuerpo alargado, brazos y patitas, manteniendo el acabado metálico dorado. Conserva los controles de saludo y expresión. La silueta deja de ser una esfera; la regla queda registrada en AGENTS.md para futuras variantes.
+
+Nombres de las mascotas por especialidad: Leo (Ventas), Mila (Servicio al cliente), Vera (Finanzas), Alma (Química y farmacia), Nico (Logística) y Lía (Mercadeo). Son identidades de la Fábrica; no reasignar nombres personalizados ni alterar recibos históricos.

@@ -21,3 +21,9 @@ Un traspaso entre proyectos exige instrucción explícita y puntual del usuario,
 ## Alcance aclarado por Rick — 25-10-2026
 
 La etapa actual define y practica las habilidades del agente de ventas como especialidad reutilizable. No se le ha asignado ningún producto, servicio ni negocio. No activar prospección real, calendarios comerciales ni integraciones de contacto por el solo hecho de definir una habilidad. Buscar oportunidades es parte esencial de la definición; su ejecución se configura después con el producto/servicio, fuentes y permisos del agente concreto. La interfaz de especialización debe mostrar habilidades y prácticas, sin exigir crear un negocio para entrenar.
+
+## Diseño del personaje — instrucción de Rick
+
+Los agentes deben representarse como mascotitas con cuerpo y personalidad, con silueta reconocible, extremidades y gestos. No usar esferas, círculos ni bolas como cuerpo del agente. La referencia tipo Dots es funcional y de compañía; crear diseños propios sin copiar personajes o recursos de terceros. Conservar la identidad negra y dorada elegida por Rick. Aplicar esta regla a futuras variantes y especialidades.
+
+Nombres de las mascotas por especialidad: Leo (Ventas), Mila (Servicio al cliente), Vera (Finanzas), Alma (Química y farmacia), Nico (Logística) y Lía (Mercadeo). Son identidades de la Fábrica; no reasignar nombres personalizados ni alterar recibos históricos.
