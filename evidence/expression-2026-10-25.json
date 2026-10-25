@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-25",
+  "scope": "Tres skills compartidas de expresión, sin proveedor de pago conectado",
+  "deployment": {
+    "version": 34,
+    "source": "6d48e55809565a7f0e195192deef7990e25de87a",
+    "url": "https://agente-ricardo-revision-rick.glassybell1025.chatgpt.site",
+    "status": "succeeded"
+  },
+  "tests": {
+    "server": 104,
+    "runner": 7,
+    "training_ui": 6,
+    "expression_player": 7,
+    "total": 124,
+    "ci_run": 40215965374,
+    "ci_commit": "057094ae3c2c5244ce8c36583134db9136a3d68d",
+    "ci_conclusion": "success",
+    "scope": "SQL y reproductor simulados; no audibilidad humana."
+  },
+  "live_ui": {
+    "dance": {
+      "plan_id": "bcbf2515-3fbb-40f9-905f-9cd216589cdf",
+      "observed": "Secuencia terminada; plan guardado"
+    },
+    "sing": {
+      "plan_id": "56fe1001-3853-42e0-bbc5-cc3f8dd34b64",
+      "observed": "Canto sintético de sílabas; Web Audio activo según reproductor",
+      "limit": "No se escuchó ni validó canto humano natural."
+    },
+    "speech": {
+      "plan_id": "1ee91368-f8d4-4c4f-bb2e-9ee8ad59ad1c",
+      "observed": "Sin voz seleccionada disponible; aviso explícito, sin fingir reproducción",
+      "status": "unsupported_on_test_browser",
+      "limit": "Habla audible pendiente de prueba en dispositivo con voz disponible o proveedor autorizado."
+    }
+  },
+  "forward_test": {
+    "cases": 3,
+    "passed": true,
+    "scope": "Skills no simulan voz ausente, respetan movimiento reducido y distinguen síntesis de voz humana."
+  },
+  "elevenlabs": {
+    "connected": false,
+    "application_submitted": false,
+    "free_plan": "10.000 créditos/mes; sin licencia comercial.",
+    "startup_grant": "33.000.000 caracteres, 12 meses; sujeto a aceptación, correo empresarial, estrategia comercial, menos de25 empleados; excluye agencias/consultoras y proyectos puntuales.",
+    "sources": [
+      "https://elevenlabs.io/pricing",
+      "https://elevenlabs.io/pricing/api",
+      "https://elevenlabs.io/startup-grants",
+      "https://help.elevenlabs.io/hc/en-us/articles/13313564601361-Can-I-publish-the-content-I-generate-on-the-platform",
+      "https://elevenlabs.io/docs/eleven-creative/products/music"
+    ]
+  },
+  "limits": [
+    "El MCP prepara; la reproducción requiere navegador activo.",
+    "Eventos browser_reported no acreditan audibilidad ni observación humana.",
+    "Canto natural y letras completas no implementados.",
+    "No se activó facturación, no se cambió el modelo ni se conectaron cuentas de ElevenLabs."
+  ]
+}
