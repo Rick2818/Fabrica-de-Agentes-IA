@@ -1,4 +1,7 @@
-# Objetivo: equivalencia funcional con Dots
+# Capacidades y requisitos de los agentes
+
+> Estado más reciente: GitHub está habilitado cada 15 minutos y la conexión manual se comprobó en el run 40144699221. La versión 21 añade encargos directos sin memoria por defecto. La prueba automática de una entrega está en curso; el historial siguiente conserva evidencia de etapas anteriores.
+
 
 Fecha de revisión: 24 de octubre de 2026. Alcance: Fábrica de Agentes IA, implementación propia. Una capacidad se acepta por su comportamiento y evidencia; la apariencia por sí sola no acredita equivalencia. La meta completa supera el MVP actual.
 

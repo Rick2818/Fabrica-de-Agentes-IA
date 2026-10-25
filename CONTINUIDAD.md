@@ -4,7 +4,7 @@
 
 El servidor conserva trabajos, fechas, resultados, cuotas y leases en D1. El navegador consulta avances; abrir, refrescar o mantener visible la página ya no dispara automáticamente la cola. Un encargo nuevo inicia su primer trabajo desde el servidor y los siguientes los retoma la programación. El botón «Ejecutar un pendiente ahora» es una intervención manual explícita y no certifica autonomía.
 
-La programación anterior de ChatGPT permanece pausada durante la preparación del reemplazo. El supervisor separado está archivado por el cupo de tareas de ChatGPT. No hay supervisión recíproca activa ni debe reactivarse automáticamente durante esta transición.
+La programación anterior de ChatGPT permanece pausada durante la preparación del reemplazo. El supervisor existente se reactivó y se adaptó a GitHub después de liberar el cupo del ejecutor anterior. No hay supervisión recíproca ni debe reactivarse el ejecutor antiguo.
 
 El nuevo workflow de GitHub está preparado para los minutos 7, 22, 37 y 52 de cada hora UTC. Tiene sus dos secretos configurados y AGENT_RUNNER_ENABLED=true. Se comprobó la conexión mediante una ejecución manual real; quedan pendientes la observación del primer evento programado y un trabajo con resultado por esta ruta. Conserva el mismo servidor, base, cuotas y controles; no agrega agentes ni servicios de pago. Ver [runner-package/README.md](runner-package/README.md).
 
@@ -36,7 +36,7 @@ Los límites del MVP se conservan: 20 intentos de IA al día en la app, máximo 
 
 Para acreditar producción se cruzan los registros nativos con los recibos del agente y los resultados guardados. La prueba en marcha usa dos entregas con fechas futuras y un objetivo que debe bloquearse porque falta su documento. El navegador de revisión permanece cerrado durante esos trabajos. No es posible observar desde aquí el estado físico de la laptop de Rick.
 
-Los resultados finales y las limitaciones se agregan a `DOTS-REQUISITOS.md` cuando exista evidencia. No declarar continuidad indefinida ni recepción de push sin pruebas.
+Los resultados finales y las limitaciones se agregan a `agentes.md` cuando exista evidencia. No declarar continuidad indefinida ni recepción de push sin pruebas.
 
 ## Alcance que sigue pendiente
 
@@ -66,4 +66,10 @@ GitHub: https://github.com/Rick2818/Fabrica-de-Agentes-IA/actions/runs/401446992
 
 Recibo del Site: source github-actions, run_id 40144699221, intento 1, mismo commit y evento; started_at 1792886163663, completed_at 1792886164506, status idle y pending 0. El consumo de IA siguió en 17/20: no se llamó al modelo durante esta prueba. El tablero apunta a github:1432658222 y conserva enabled=true.
 
-Al registrar esta evidencia, el primer evento schedule y una entrega procesada por GitHub todavía no están comprobados. La prueba manual acredita autenticación, acceso al endpoint y lectura de la cola; no una entrega de IA ni disponibilidad indefinida. Los disparadores antiguos de ChatGPT y el supervisor permanecen pausados.
+Al registrar esta evidencia, el primer evento schedule y una entrega procesada por GitHub todavía no están comprobados. La prueba manual acredita autenticación, acceso al endpoint y lectura de la cola; no una entrega de IA ni disponibilidad indefinida. El disparador antiguo de ejecución en ChatGPT permanece pausado; el supervisor se adaptó después al nuevo ejecutor de GitHub.
+
+## Supervisión del ejecutor de GitHub
+
+Se reutiliza la programación 6add39eb78f48191a1f6c7dfea32ed45, ahora «Supervisar Fábrica de Agentes IA», con revisión horaria en America/El_Salvador. Su activación fue confirmada; su primera ejecución con estas instrucciones todavía debe observarse. Consulta GitHub y agent_status, contrasta identificadores reales y alerta ante fallos, ciclos atascados o ausencia de recibos programados por más de 90 minutos. Respeta la pausa del tablero y las cuotas. No puede certificar el estado enabled del workflow mediante el conector actual ni reparar permisos o credenciales. No reactiva el ejecutor antiguo ni crea tareas.
+
+Los avisos se preparan en ChatGPT y se conservan en la bandeja del MVP; no se acredita entrega de push ni lectura humana.

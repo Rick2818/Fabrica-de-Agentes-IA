@@ -32,7 +32,7 @@ Fábrica de Agentes IA es un desarrollo independiente. No está afiliado, patroc
 - Solo redacción y análisis de información proporcionada. El MVP no tiene navegador propio ni acceso automático a las aplicaciones conectadas a ChatGPT.
 - La ejecución recurrente exige un disparador externo activo. La configuración de una programación y una ejecución manual no certifican autonomía continua.
 
-Consultar `DOTS-REQUISITOS.md` para capacidades, evidencias y pendientes. Las referencias funcionales a Dots orientan capacidades deseadas; su implementación debe ser independiente y cumplir las reglas de procedencia.
+Consultar `agentes.md` para capacidades, evidencias y pendientes. Las referencias funcionales a Dots orientan capacidades deseadas; su implementación debe ser independiente y cumplir las reglas de procedencia.
 
 ## Código y comprobación
 

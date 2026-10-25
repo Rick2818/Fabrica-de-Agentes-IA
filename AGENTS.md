@@ -4,7 +4,7 @@ Construir un producto de agentes independiente, con planificación, memoria, tar
 
 Usar la documentación oficial de https://learn.chatgpt.com/docs/dots y sus guías de tareas/memoria, computadores/apps, canales y controles como referencia funcional pública de necesidades, redactadas en palabras propias. Consultar su versión vigente antes de ampliar capacidades. La documentación del producto no equivale a acceso a su código o infraestructura.
 
-Mantener DOTS-REQUISITOS.md con capacidades, evidencia y brechas. No declarar equivalencia completa, autonomía horaria, conexión local ni acceso a plugins sin pruebas reales por capacidad. Distinguir ejecución manual en nube de una ejecución disparada por programación.
+Mantener agentes.md con capacidades, evidencia y brechas. No declarar equivalencia completa, autonomía horaria, conexión local ni acceso a plugins sin pruebas reales por capacidad. Distinguir ejecución manual en nube de una ejecución disparada por programación.
 
 Respetar la preferencia de opciones gratuitas. No habilitar facturación, cambiar proveedor/modelo, contratar infraestructura ni ampliar permisos externos sin autorización. Los conectores de ChatGPT no se heredan automáticamente en esta aplicación.
 
