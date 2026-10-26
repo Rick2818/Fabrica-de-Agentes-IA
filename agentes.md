@@ -114,7 +114,7 @@ Mascota original con orejas, cuerpo alargado, brazos y patitas, manteniendo el a
 
 Nombres de las mascotas por especialidad: Leo (Ventas), Mila (Servicio al cliente), Vera (Finanzas), Alma (Química y farmacia), Nico (Logística) y Lía (Mercadeo). Son identidades de la Fábrica; no reasignar nombres personalizados ni alterar recibos históricos.
 
-## Leo: herramientas elegidas por el modelo (27-10-2026)
+## Leo: herramientas elegidas por el modelo (26-10-2026)
 
 Se implementa function calling nativo de Gemini sin cambiar modelo ni facturación. Solo los objetivos con consentimiento `[TOOLS:read-only]` habilitan lectura HTTPS de texto en dominios públicos enumerados y sales_qualify. La interfaz ofrece esa opción al encargar el objetivo. La selección la hace Gemini, el servidor valida y ejecuta, guarda recibos inmutables con hash, y otro ciclo redacta a partir de functionResponse conservando la firma del modelo. El estado intermedio persiste y respeta pausa, cancelación, cuota y lease; no se repiten herramientas al redactar.
 

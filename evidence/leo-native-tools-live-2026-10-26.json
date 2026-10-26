@@ -1,0 +1,53 @@
+{
+  "objective": {
+    "id": "leo-native-functions-20261026",
+    "title": "Leo: lectura pública elegida por Gemini",
+    "description": "[TOOLS:read-only]\nPrueba técnica con datos públicos y sintéticos. En UN solo paso de ejecución, llamá read_public_page para leer https://example.com y github_repository para leer owner openai, repo openai-agents-js. No se acepta usar conocimientos previos ni recibos aportados: las funciones las debés solicitar vos. Entregá título de la página, nombre del repositorio, URLs y los IDs de recibos recibidos. Si una lectura falla, indicá su error real. No envíes mensajes ni hagás escrituras externas.",
+    "criteria": "Un paso de ejecución con llamadas reales a las dos herramientas, resultado guardado con sus IDs y fuentes, sin afirmar acceso privado ni navegador interactivo. Revisar la entrega. Máximo 150 palabras.",
+    "status": "done",
+    "version": 1,
+    "plan": "[{\"title\":\"Lectura de example.com y repositorio GitHub\",\"prompt\":\"Ejecutar la lectura publica de https://example.com mediante la herramienta read_public_page y consultar el repositorio openai/openai-agents-js mediante github_repository. Documentar el titulo de la pagina, el nombre del repositorio, las URLs y los IDs de los recibos obtenidos.\"}]",
+    "step_index": 0,
+    "revision": 0,
+    "api_calls": 7,
+    "result": "1. Página pública:\n- Título: Example Domain\n- URL: https://example.com/\n- ID Recibo: g-leo-native-functions-20261026-v1-step-0-r0-tool-0\n\n2. Repositorio GitHub:\n- Repositorio: openai/openai-agents-js\n- URL: https://github.com/openai/openai-agents-js\n- ID Recibo: g-leo-native-functions-20261026-v1-step-0-r0-tool-1\n- Estado/Error: Error HTTP 403 (La fuente externa devolvió HTTP 403)\n\nEjecutado en un solo paso con herramientas de solo lectura, sin navegador interactivo ni accesos privados.",
+    "review": "La ejecución cumple con los criterios solicitados: se realizaron las llamadas a las herramientas de solo lectura en un solo paso, documentando título, nombre de repositorio, URLs, IDs de recibos y notificando el error HTTP 403 real sin asumir accesos privados ni navegador interactivo.",
+    "error": "",
+    "paused_from": "",
+    "created_at": 1793045758032,
+    "updated_at": 1793046075776
+  },
+  "jobs": [
+    {
+      "id": "g-leo-native-functions-20261026-v1-verify-1-r0",
+      "phase": "verify",
+      "status": "done",
+      "evidence": "{\"provider\":\"Google\",\"model\":\"gemini-3.6-flash\",\"http\":200,\"completed_at\":1793046075776,\"sha256\":\"08ad481cb46fedc9f7a16022a910b7d6776566cee8e805549edcf0bbf3a6383d\",\"characters\":491,\"execution_source\":\"mcp\",\"context_mode\":\"saved\"}",
+      "result": "1. Página pública:\n- Título: Example Domain\n- URL: https://example.com/\n- ID Recibo: g-leo-native-functions-20261026-v1-step-0-r0-tool-0\n\n2. Repositorio GitHub:\n- Repositorio: openai/openai-agents-js\n- URL: https://github.com/openai/openai-agents-js\n- ID Recibo: g-leo-native-functions-20261026-v1-step-0-r0-tool-1\n- Estado/Error: Error HTTP 403 (La fuente externa devolvió HTTP 403)\n\nEjecutado en un solo paso con herramientas de solo lectura, sin navegador interactivo ni accesos privados."
+    },
+    {
+      "id": "g-leo-native-functions-20261026-v1-step-0-r0",
+      "phase": "step",
+      "status": "done",
+      "evidence": "{\"provider\":\"Google\",\"model\":\"gemini-3.6-flash\",\"http\":200,\"completed_at\":1793046043959,\"sha256\":\"17d48e0a52c30511baa4bd8eeda14927c2c26440c12fa4e1cc114eed365cdfd2\",\"characters\":522,\"execution_source\":\"mcp\",\"context_mode\":\"saved\",\"tool_receipts\":[{\"id\":\"g-leo-native-functions-20261026-v1-step-0-r0-tool-0\",\"job_id\":\"g-leo-native-functions-20261026-v1-step-0-r0\",\"operation\":\"read_public_page\",\"arguments\":{\"url\":\"https://example.com\"},\"output\":{\"url\":\"https://example.com/\",\"title\":\"Example Domain\",\"text\":\"Example Domain This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.\",\"truncated\":false,\"bytes\":577,\"checked_at\":1793045940705,\"scope\":\"Lectura pública de texto; sin navegador, inicio de sesión ni verificación de afirmaciones.\"},\"at\":1793045940705,\"source\":\"model_function_call\",\"external_writes\":false,\"sha256\":\"33230e8e9f9ac90766720bc9a92765e5240decc6b15cfec2c8ceea5c3c352a66\"},{\"id\":\"g-leo-native-functions-20261026-v1-step-0-r0-tool-1\",\"job_id\":\"g-leo-native-functions-20261026-v1-step-0-r0\",\"operation\":\"github_repository\",\"arguments\":{\"repo\":\"openai-agents-js\",\"owner\":\"openai\"},\"error\":\"La fuente externa devolvió HTTP 403\",\"at\":1793045940926,\"source\":\"model_function_call\",\"external_writes\":false,\"sha256\":\"9baa9646e32e892feb70a749fc973d019b458ac8c4a1f8b4086e3d3cb7139666\"}]}",
+      "result": "Resultados de la consulta:\n\n1. Página pública:\n- Título: Example Domain\n- URL: https://example.com/\n- ID de recibo: g-leo-native-functions-20261026-v1-step-0-r0-tool-0\n\n2. Repositorio GitHub:\n- Repositorio: openai/openai-agents-js\n- URL: https://github.com/openai/openai-agents-js\n- ID de recibo: g-leo-native-functions-20261026-v1-step-0-r0-tool-1\n- Estado: Error al leer el repositorio (La fuente externa devolvió HTTP 403).\n\nProceso realizado en un solo paso mediante llamadas reales a las herramientas de solo lectura."
+    },
+    {
+      "id": "g-leo-native-functions-20261026-v1-plan-0-r0",
+      "phase": "plan",
+      "status": "done",
+      "evidence": "{\"provider\":\"Google\",\"model\":\"gemini-3.6-flash\",\"http\":200,\"completed_at\":1793045928933,\"sha256\":\"f2ad7d2584e441eec81e93d10a472a76e5dc66eb8cba325bc0c54382f05a65b5\",\"characters\":46,\"execution_source\":\"mcp\",\"context_mode\":\"saved\"}",
+      "result": "1. Lectura de example.com y repositorio GitHub"
+    }
+  ],
+  "published_version": 38,
+  "site_commit": "304af836f5f0134382eb0eec837ef0dc7182519c",
+  "github_commit": "ff8edba8b7a2fa16f6f9206d02fc422127f3ff7e",
+  "limits": [
+    "Read-only public text, not interactive browser",
+    "GitHub public API returned HTTP 403",
+    "No Sites connector eligibility tool available",
+    "Manual MCP verification; not a new scheduled execution"
+  ],
+  "checked_at": 1793046097033
+}

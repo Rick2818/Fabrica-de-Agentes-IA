@@ -1,0 +1,14 @@
+{
+  "passed": 107,
+  "scope": "Local SQL real; Gemini simulado para fallos, cancelación y recuperación.",
+  "new_checks": [
+    "Leo llama herramientas, conserva firma y recibos y retoma sin repetir lecturas",
+    "Leo no habilita herramientas en objetivos sin permiso explícito",
+    "Lector público bloquea redes internas, parámetros, redirecciones y páginas enormes"
+  ],
+  "site_version": 38,
+  "site_commit": "304af836f5f0134382eb0eec837ef0dc7182519c",
+  "github_commit": "ff8edba8b7a2fa16f6f9206d02fc422127f3ff7e",
+  "live_test": "leo-native-functions-20261026",
+  "live_status": "First planning attempt HTTP 503; preserved for retry. Not certified."
+}
