@@ -503,6 +503,21 @@ export default {async fetch(request,env,ctx){
     return json(await runSpecialistTool(env.DB,a));
    }
    if(url.pathname==='/api/training/specialist-tool'&&request.method==='GET')return json({receipt:await trainingGet(env.DB,'specialist_latest:'+url.searchParams.get('profile_id'))});
+   if(url.pathname==='/api/agents/leo/qualify'&&request.method==='POST'){
+    // Real specialist tool, permanently linked to Leo's approved Site profile.
+    const p=(await trainingProfiles(env.DB)).find(x=>x.name==='Leo'&&x.specialty==='Ventas');
+    if(!p)return json({error:'Primero configurá el perfil productivo de Leo.'},409);
+    const a=await parse(request);
+    if(!Array.isArray(a.requests)||!a.requests.length||a.requests.length>30)
+      return json({error:'Proporcioná de 1 a 30 solicitudes verificables.'},400);
+    const {receipt}=await runSpecialistTool(env.DB,{profile_id:p.id,operation:'sales_qualify',data:{requests:a.requests}});
+    return json({agent:'Leo',receipt,restriction:'La calificación usa evidencia aportada; ningún contacto se envía ni se navega a estas fuentes.'});
+   }
+   if(url.pathname==='/api/agents/leo/qualify'&&request.method==='GET'){
+    const p=(await trainingProfiles(env.DB)).find(x=>x.name==='Leo'&&x.specialty==='Ventas');
+    if(!p)return json({error:'Perfil Leo no configurado.'},409);
+    return json({agent:'Leo',receipt:await trainingGet(env.DB,'specialist_latest:'+p.id)});
+   }
    if(url.pathname==='/api/agents/leo/objectives'&&request.method==='POST'){
     // Leo usa el ejecutor central persistente, con límites explícitos de acciones.
     const a=await parse(request);
