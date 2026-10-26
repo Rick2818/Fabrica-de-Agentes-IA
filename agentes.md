@@ -113,3 +113,11 @@ El 24-10-2026 el proyecto y su repositorio pasaron a llamarse Fábrica de Agente
 Mascota original con orejas, cuerpo alargado, brazos y patitas, manteniendo el acabado metálico dorado. Conserva los controles de saludo y expresión. La silueta deja de ser una esfera; la regla queda registrada en AGENTS.md para futuras variantes.
 
 Nombres de las mascotas por especialidad: Leo (Ventas), Mila (Servicio al cliente), Vera (Finanzas), Alma (Química y farmacia), Nico (Logística) y Lía (Mercadeo). Son identidades de la Fábrica; no reasignar nombres personalizados ni alterar recibos históricos.
+
+## Leo: herramientas elegidas por el modelo (27-10-2026)
+
+Se implementa function calling nativo de Gemini sin cambiar modelo ni facturación. Solo los objetivos con consentimiento `[TOOLS:read-only]` habilitan lectura HTTPS de texto en dominios públicos enumerados y sales_qualify. La interfaz ofrece esa opción al encargar el objetivo. La selección la hace Gemini, el servidor valida y ejecuta, guarda recibos inmutables con hash, y otro ciclo redacta a partir de functionResponse conservando la firma del modelo. El estado intermedio persiste y respeta pausa, cancelación, cuota y lease; no se repiten herramientas al redactar.
+
+No es un navegador interactivo: no ejecuta JavaScript, inicia sesión, rellena formularios ni hereda conectores de ChatGPT. El entorno no expone list_plugin_eligibility, requisito de Sites para declarar conectores externos; quedan pendientes y no se simulan. No se afirma paridad con Dots. Los ensayos locales simulan Gemini; la prueba en producción se registra por separado.
+
+Referencia de protocolo, sin copiar código privado: https://ai.google.dev/gemini-api/docs/function-calling . Referencia funcional: https://learn.chatgpt.com/docs/dots/computers-and-apps . Implementación propia.

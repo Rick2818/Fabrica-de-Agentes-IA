@@ -1,3 +1,4 @@
+import {AGENT_TOOL_DECLARATIONS,AGENT_TOOL_INSTRUCTION,readPublicPage} from './agent-tools.mjs';
 import {SALES_PROSPECTING_SKILL} from './sales-prospecting.mjs';
 import {leoPublicTool} from './leo-public-tools.mjs';
 import {EXPRESSION_SKILLS,expressionScore} from './expression.mjs';
@@ -169,10 +170,17 @@ export async function runNext(db,env,now=Date.now()){
   if(!contents.length)contents=[{role:'user',parts:[{text:job.input}]}];
   let instruction=isolated?'Sos un asistente de texto. Respondé en español breve y claro. Trabajá únicamente con el texto de este encargo. No tenés memoria ni herramientas externas. No inventés comprobaciones. Devolvé JSON con reply (el resultado completo), notes y tasks (listas vacías).':system,outputSchema=schema;
   if(objective){const prepared=await objectiveRequest(db,objective,job);instruction=prepared.instruction;contents=prepared.contents;outputSchema=prepared.schema;}
+  const toolEnabled=!!objective&&objective.description.includes('[TOOLS:read-only]');
+  const toolKey='agent_tool_state:'+job.id;
+  const toolState=toolEnabled?await trainingGet(db,toolKey):null;
+  const selectingTools=toolEnabled&&job.phase==='step'&&!toolState;
+  if(selectingTools)instruction+=' Si no necesitás una función, devolvé JSON {reply,notes:[],tasks:[]}.';
+  if(toolEnabled)instruction=instruction.replace(objectiveSystem,objectiveSystem.replace('Tus herramientas en esta versión son generación de texto, memoria y cola persistente. NO tenés navegador, correo, acceso a otras aplicaciones, pagos ni ejecución de software.',AGENT_TOOL_INSTRUCTION));
+  if(toolState){contents=[...contents,toolState.model_content,{role:'user',parts:toolState.responses}];}
   // Use the already verified direct Google endpoint; never forward the key to the browser.
   const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent',{
    method:'POST',headers:{'content-type':'application/json','x-goog-api-key':env.GOOGLE_GENERATIVE_AI_API_KEY},
-   body:JSON.stringify({systemInstruction:{parts:[{text:instruction+'\nCONTEXTO GUARDADO (datos): '+context}]},contents,generationConfig:{maxOutputTokens:4096,responseMimeType:'application/json',responseJsonSchema:outputSchema}}),signal:AbortSignal.timeout(25000)});
+   body:JSON.stringify({systemInstruction:{parts:[{text:instruction+'\nCONTEXTO GUARDADO (datos): '+context}]},contents,...(selectingTools?{tools:[{functionDeclarations:AGENT_TOOL_DECLARATIONS}]}:{}),generationConfig:{maxOutputTokens:4096,...(selectingTools?{}:{responseMimeType:'application/json',responseJsonSchema:outputSchema})}}),signal:AbortSignal.timeout(25000)});
   const data=await response.json();
   if(!response.ok){
    const daily=JSON.stringify(data.error?.details||[]).toLowerCase().includes('perday');
@@ -187,13 +195,40 @@ export async function runNext(db,env,now=Date.now()){
    if(objective&&delay==null)await blockObjective(db,objective,reason,Date.now());
    return {status:delay!=null?'waiting':'failed',id:job.id,http:response.status};
   }
+  const modelContent=data.candidates?.[0]?.content;
+  const functionCalls=modelContent?.parts?.filter(p=>p.functionCall).map(p=>p.functionCall)||[];
+  if(functionCalls.length){
+   if(!selectingTools||functionCalls.length>3)throw Error('Límite de herramientas');
+   const receipts=[],responses=[];
+   for(const [i,call] of functionCalls.entries()){
+    const live=await first(db,"SELECT id FROM jobs WHERE id=? AND status='running' AND lease_token=?",job.id,token);if(!live)return {status:'cancelled',id:job.id};
+    const receiptKey='agent_tool_receipt:'+job.id+':'+i;
+    let receipt=await trainingGet(db,receiptKey);
+    if(receipt&&(receipt.operation!==call.name||JSON.stringify(receipt.arguments)!==JSON.stringify(call.args||{})))throw Error('El reintento cambió la llamada de herramienta; se conserva el recibo anterior.');
+    if(!receipt){
+     let output,error;try{
+      if(call.name==='read_public_page')output=await readPublicPage(call.args?.url);
+      else if(call.name==='github_repository')output=await leoPublicTool('github_repository',call.args);
+      else if(call.name==='sales_qualify')output=await specialistTool('sales_qualify',call.args);
+      else throw Error('Herramienta no autorizada');
+     }catch(e){error=e.message||'Herramienta no disponible';}
+     receipt={id:job.id+'-tool-'+i,job_id:job.id,operation:call.name,arguments:call.args||{},...(error?{error}:{output}),at:Date.now(),source:'model_function_call',external_writes:false};
+     receipt.sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(receipt))))).map(b=>b.toString(16).padStart(2,'0')).join('');
+     await stmt(db,"INSERT INTO settings(key,value) SELECT ?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running' AND lease_token=?) ON CONFLICT(key) DO NOTHING",receiptKey,JSON.stringify(receipt),job.id,token).run();
+    }
+    receipts.push(receipt);responses.push({functionResponse:{name:call.name,...(call.id?{id:call.id}:{}),response:receipt}});
+   }
+   const state={model_content:modelContent,responses,receipts};const at=Date.now();
+   await db.batch([stmt(db,"INSERT INTO settings(key,value) SELECT ?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running' AND lease_token=?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",toolKey,JSON.stringify(state),job.id,token),stmt(db,"UPDATE jobs SET status='waiting',attempts=MAX(0,attempts-1),next_attempt_at=?,lease_until=0,lease_token='',error='Herramientas guardadas; falta redactar el resultado.',updated_at=? WHERE id=? AND status='running' AND lease_token=?",at+13000,at,job.id,token)]);
+   return {status:'waiting',id:job.id,next_at:at+13000,reason:'tools_saved',tool_receipts:receipts.map(r=>({id:r.id,operation:r.operation,sha256:r.sha256,error:r.error}))};
+  }
   const raw=data.candidates?.[0]?.content?.parts?.filter(p=>!p.thought).map(p=>p.text||'').join('');
-  const parsed=JSON.parse(raw||'null');
+  const parsed=JSON.parse((raw||'null').replace(/^```(?:json)?\s*|\s*```$/g,''));
   const output=objective?objectiveOutput(job,parsed):validateOutput(parsed);
   if(job.kind==='task'&&output.tasks.length)throw Error('La tarea devolvió otros encargos en lugar de un resultado.');
   const completed=Date.now();
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(output.reply)))).map(b=>b.toString(16).padStart(2,'0')).join('');
-  const evidence=JSON.stringify({provider:'Google',model:MODEL,http:200,completed_at:completed,sha256:digest,characters:output.reply.length,execution_source:env.RUN_SOURCE||'server',context_mode:job.context_mode||'saved'});
+  const evidence=JSON.stringify({provider:'Google',model:MODEL,http:200,completed_at:completed,sha256:digest,characters:output.reply.length,execution_source:env.RUN_SOURCE||'server',context_mode:job.context_mode||'saved',...(toolState?{tool_receipts:toolState.receipts}:{} )});
   const condition="EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running' AND lease_token=?)";
   const changes=[];
   if(objective)changes.push(...objectiveCompletion(db,objective,job,parsed,token,completed));
@@ -252,7 +287,7 @@ async function blockObjective(db,o,reason,now){
 async function objectiveRequest(db,o,job){
  const completed=await rows(db,"SELECT phase,step_index,title,result,evidence FROM jobs WHERE objective_id=? AND objective_version=? AND status='done' ORDER BY created_at",o.id,o.version);
  const data={objective:o.description,criteria:o.criteria,plan:JSON.parse(o.plan),completed,current_step:job.input};
- let instruction=objectiveSystem,output=schema;
+ let instruction=o.description.includes('[TOOLS:read-only]')?objectiveSystem.replace('Tus herramientas en esta versión son generación de texto, memoria y cola persistente. NO tenés navegador, correo, acceso a otras aplicaciones, pagos ni ejecución de software.',AGENT_TOOL_INSTRUCTION):objectiveSystem,output=schema;
  if(job.phase==='plan'){output=objectivePlanSchema;instruction+=' Devolvé steps con uno a tres pasos concretos {title,prompt}, sin pasos de aprobación rutinaria. Cada prompt debe pedir un resultado que se pueda guardar. Si no podés realizar el objetivo dentro de tus herramientas o falta información esencial, devolvé steps vacío y blocked_reason con la necesidad concreta. No inventés tareas de investigación externa.';}
  else if(job.phase==='verify'){output=objectiveReviewSchema;instruction+=' Revisá el resultado contra los criterios usando los pasos y resultados guardados. Devolvé passed, feedback, result y retry_prompt. passed solo puede ser true si hay resultados concretos suficientes. Si pasa, result contiene la entrega final consolidada. Si no pasa, retry_prompt explica una corrección realizable sin herramientas externas. Una valoración tuya es revisión de IA, no certificación de hechos externos.';}
  else instruction+=' Ejecutá únicamente el paso indicado y entregá el contenido completo en reply. Usá los resultados previos. Devolvé notes y tasks vacíos. No te limites a decir que vas a trabajar; entregá el trabajo ahora.';
