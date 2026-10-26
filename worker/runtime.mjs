@@ -1,4 +1,5 @@
 import {SALES_PROSPECTING_SKILL} from './sales-prospecting.mjs';
+import {leoPublicTool} from './leo-public-tools.mjs';
 import {EXPRESSION_SKILLS,expressionScore} from './expression.mjs';
 import {SPECIALTY_SKILLS,selectedSpecialtySkills,SPECIALTY_TOOLKITS} from './specialty-skills.mjs';
 import {specialistTool,SPECIALIST_OPERATIONS} from './specialist-tools.mjs';
@@ -504,6 +505,23 @@ export default {async fetch(request,env,ctx){
     return json(await runSpecialistTool(env.DB,a));
    }
    if(url.pathname==='/api/training/specialist-tool'&&request.method==='GET')return json({receipt:await trainingGet(env.DB,'specialist_latest:'+url.searchParams.get('profile_id'))});
+   if(url.pathname==='/api/agents/leo/research'&&request.method==='POST'){
+    const p=(await trainingProfiles(env.DB)).find(x=>x.name==='Leo'&&x.specialty==='Ventas');
+    if(!p)return json({error:'Perfil productivo de Leo pendiente de configuración.'},409);
+    const a=await parse(request,4000);
+    const result=await leoPublicTool(a.kind,a.input);
+    const receipt={id:crypto.randomUUID(),profile_id:p.id,...result,scope:'Consulta externa pública verificada por HTTP; NO confirma intención comercial ni ejecuta contactos.'};
+    const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(receipt)));
+    receipt.sha256=Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    await trainingSet(env.DB,'leo_research_receipt:'+receipt.id,receipt);
+    await trainingSet(env.DB,'leo_research_latest:'+p.id,receipt);
+    return json({agent:'Leo',receipt});
+   }
+   if(url.pathname==='/api/agents/leo/research'&&request.method==='GET'){
+    const p=(await trainingProfiles(env.DB)).find(x=>x.name==='Leo'&&x.specialty==='Ventas');
+    if(!p)return json({error:'Perfil Leo no configurado.'},409);
+    return json({receipt:await trainingGet(env.DB,'leo_research_latest:'+p.id)});
+   }
    if(url.pathname==='/api/agents/leo/qualify'&&request.method==='POST'){
     // Real specialist tool, permanently linked to Leo's approved Site profile.
     const p=(await trainingProfiles(env.DB)).find(x=>x.name==='Leo'&&x.specialty==='Ventas');
