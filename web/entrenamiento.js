@@ -65,17 +65,30 @@ function registrationInput(){return {...Object.fromEntries(['ingredient','streng
 function renderRegistration(plan){$('reg-name').value=plan.product_name;for(const key of ['ingredient','strength','dosage_form','holder','manufacturer','manufacturing_country'])$('reg-'+key).value=plan.product_identity?.[key]||'';$('reg-type').value=plan.classification.product_type;$('reg-origin').value=plan.classification.origin;$('reg-procedure').value=plan.classification.procedure;$('reg-contract').value=plan.classification.manufacturing_contract==null?'unknown':plan.classification.manufacturing_contract?'yes':'no';const out=$('registration-output');out.replaceChildren();registrationRows=[];const title=document.createElement('h3');title.textContent=plan.state;out.append(title);for(const q of plan.questions){const p=document.createElement('p');p.textContent='Por confirmar: '+q;out.append(p)}const help=document.createElement('p');help.textContent='Revisá la prelista. Indicá referencia y estado de cada documento disponible; volvé a preparar el expediente para actualizar pendientes. No se leen archivos automáticamente.';out.append(help);for(const doc of plan.checklist){const box=document.createElement('details'),heading=document.createElement('summary');heading.textContent=doc.index+'. '+doc.label+' · '+({missing:'No aportado',available:'Disponible, sin revisar',reviewed:'Revisión declarada',not_applicable:'Excepción por validar'}[doc.status]);box.append(heading);const basis=document.createElement('p');basis.textContent=doc.basis;const label=document.createElement('label');label.textContent='Estado';const status=document.createElement('select');status.setAttribute('aria-label','Estado de '+doc.label);for(const [value,text] of [['missing','No aportado'],['available','Disponible; pendiente de revisar'],['reviewed','Revisado por profesional (declarado)'],['not_applicable','No aplica; requiere justificación']]){const o=document.createElement('option');o.value=value;o.textContent=text;status.append(o)}status.value=doc.status;const reference=document.createElement('input');reference.setAttribute('aria-label','Referencia de '+doc.label);reference.placeholder='Nombre, versión y página del documento';reference.maxLength=300;reference.value=doc.reference;const justification=document.createElement('input');justification.setAttribute('aria-label','Justificación de '+doc.label);justification.placeholder='Justificación si no aplica';justification.maxLength=500;justification.value=doc.justification;box.append(basis,label,status,reference,justification);out.append(box);registrationRows.push({key:doc.key,status,reference,justification})}const h=document.createElement('h3');h.textContent='Solicitud de faltantes · borrador';const draft=document.createElement('textarea');draft.readOnly=true;draft.value=plan.request_draft;draft.setAttribute('aria-label','Borrador de solicitud de documentos');out.append(h,draft);for(const source of plan.sources){const p=document.createElement('p'),a=document.createElement('a');a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=source.title;p.append(a);out.append(p)}const scope=document.createElement('p');scope.textContent=plan.scope;out.append(scope)}
 $('prepare-registration').onclick=()=>$('run-specialty-tool').onclick();
 async function loadSpecialties(){try{specialtyCatalog=await api('/api/training/specialties');renderSpecialty()}catch(e){notice('No se pudo cargar el catálogo de especialidades. '+e.message)}}
-function selectRequestedSpecialty(){
- if(typeof location==='undefined')return;
- if(!cloudReady)return;
- const requested=new URLSearchParams(location.search).get('especialidad');
- if(requested===null||!/^\d$/.test(requested))return;
- const specialty=Object.keys(mascotNames)[Number(requested)];if(!specialty)return;
+function selectRequestedSpecialty(override=null){
+ if(typeof location==='undefined')return false;
+ if(!cloudReady)return false;
+ const requested=override===null?new URLSearchParams(location.search).get('especialidad'):String(override);
+ if(requested===null||!/^\d$/.test(requested))return false;
+ const specialty=Object.keys(mascotNames)[Number(requested)];if(!specialty)return false;
  const existing=data.find(p=>p.specialty===specialty&&p.name===mascotNames[specialty])||data.find(p=>p.specialty===specialty);
  if(existing){selected=existing.id;render();notice('Elegiste a '+mascotNames[specialty]+' · '+specialty+'.');}
  else if(specialtyCatalog){$('template-specialty').value=specialty;$('create-template').onclick();}
+ else {notice('El catálogo de especialistas todavía no está disponible. Usá «Actualizar fichas y resultados» para reintentar.');return false;}
  $('name').scrollIntoView?.({block:'center',behavior:'instant'});
  $('name').focus?.({preventScroll:true});
+ return true;
 }
+// Cambiar de especialista sin recargar la página evita perder el estado temporal.
+document.addEventListener('click',event=>{
+ const link=event.target?.closest?.('a.pet-card[href*="especialidad="]');
+ if(!link||!cloudReady)return;
+ const target=new URL(link.href,location.href);
+ const requested=target.searchParams.get('especialidad');
+ if(selectRequestedSpecialty(requested)){
+  event.preventDefault();
+  history.replaceState(null,'',target.pathname+target.search);
+ }
+});
 render();Promise.all([cloudLoad(),loadSpecialties()]).then(selectRequestedSpecialty);loadSalesSkill();
 
