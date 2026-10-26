@@ -22,3 +22,15 @@
 @media(prefers-reduced-motion:reduce){.pet-card:hover{transform:none}}
 
 .pet-shell{min-width:0;display:flex;flex-direction:column;border-radius:18px;overflow:hidden}.pet-shell .pet-card{flex:1}.pet-shell .pet-controls{padding:8px;background:#0d0b09;border:1px solid #493b23;border-top:0;border-radius:0 0 12px 12px}.pet-shell .pet-controls button{min-height:38px}
+
+/* Acabado metálico: luz especular, pigmento saturado y sombra profunda. */
+.pet-card svg linearGradient stop:first-child{stop-color:#fff8e8}
+.pet-card svg linearGradient stop:nth-child(2){stop-color:var(--agent)}
+.pet-card svg linearGradient stop:nth-child(3){stop-color:var(--agent)}
+.pet-card svg linearGradient stop:last-child{stop-color:#332c34}
+.pet-grid > .pet-shell:nth-child(2) .pet-card svg linearGradient stop:first-child{stop-color:#d5fff5}
+.pet-grid > .pet-shell:nth-child(3) .pet-card svg linearGradient stop:first-child{stop-color:#e1eaff}
+.pet-grid > .pet-shell:nth-child(4) .pet-card svg linearGradient stop:first-child{stop-color:#f2dfff}
+.pet-grid > .pet-shell:nth-child(5) .pet-card svg linearGradient stop:first-child{stop-color:#ffe6b9}
+.pet-grid > .pet-shell:nth-child(6) .pet-card svg linearGradient stop:first-child{stop-color:#ffe0f0}
+.pet-card svg .pet-body>path:nth-child(2){filter:drop-shadow(0 0 3px rgba(var(--agent-rgb),.45))}
