@@ -503,6 +503,20 @@ export default {async fetch(request,env,ctx){
     return json(await runSpecialistTool(env.DB,a));
    }
    if(url.pathname==='/api/training/specialist-tool'&&request.method==='GET')return json({receipt:await trainingGet(env.DB,'specialist_latest:'+url.searchParams.get('profile_id'))});
+   if(url.pathname==='/api/agents'&&request.method==='GET'){
+    // Catálogo productivo de especialidades enlazado a perfiles reales del Site.
+    // Una práctica aprobada habilita visualización, NO permisos de acción externa.
+    const profiles=await trainingProfiles(env.DB),names={'Ventas':'Leo','Servicio al cliente':'Mila','Finanzas':'Vera','Química y farmacia':'Alma','Logística':'Nico','Mercadeo':'Lía'};
+    const agents=await Promise.all(Object.entries(names).map(async([specialty,name])=>{
+      const p=profiles.find(x=>x.specialty===specialty&&x.name===name)||profiles.find(x=>x.specialty===specialty);
+      const practice=p?await trainingPractice(env.DB,p):null;
+      return {name,specialty,profile_id:p?.id||null,training_status:practice?.status||'not_started',
+        training_approval:practice?.approval||'pending',training_receipt_id:practice?.receipt?.id||null,
+        configured:!!p,external_tools_enabled:false,autonomous_actions_certified:false,
+        training_url:'/entrenamiento.html?especialidad='+Object.keys(names).indexOf(specialty)};
+    }));
+    return json({agents,scope:'Fichas y recibos reales del Site. La certificación de entrenamiento no autoriza acciones externas.'});
+   }
    if(url.pathname==='/api/training/profiles'&&request.method==='GET'){
     const profiles=await trainingProfiles(env.DB);
     return json({profiles:await Promise.all(profiles.map(async p=>({...p,practice:await trainingPractice(env.DB,p)})))});
