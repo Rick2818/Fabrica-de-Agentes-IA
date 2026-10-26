@@ -14,3 +14,9 @@
 .language-switch button{border:0;border-radius:6px;min-width:39px;min-height:34px;background:transparent;color:#b1a999;font-weight:700;font-size:12px;cursor:pointer}
 .language-switch button[aria-pressed="true"]{color:#171009;background:linear-gradient(110deg,#b9852b,#ffe5a0 52%,#bb8737)}
 .language-switch button:focus-visible{outline:2px solid #ffe5a0;outline-offset:2px}
+
+/* Cambiar el pigmento real del SVG, no solo el resplandor de las tarjetas. */
+.pet-card svg linearGradient stop:nth-child(2),.pet-card svg linearGradient stop:nth-child(3){stop-color:var(--agent)}
+.pet-card svg .pet-body > path:first-child{fill:var(--agent)}
+.pet-card svg .pet-body > path:nth-child(2){stroke:var(--agent)}
+@media(prefers-reduced-motion:reduce){.pet-card:hover{transform:none}}
