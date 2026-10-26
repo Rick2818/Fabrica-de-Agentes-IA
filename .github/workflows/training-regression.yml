@@ -19,6 +19,7 @@ jobs:
       - run: node scripts/test-cloud-runner.mjs
       - run: node --check web/mascot-expressions.js && node --check web/i18n.js
       - run: node scripts/test-training-ui.mjs
+      - run: node --experimental-vm-modules examples/official-agents-sdk/test-pattern.mjs
       - run: node scripts/test-expression.mjs
       - run: node scripts/build.mjs
       - run: node scripts/validate-artifact.mjs
