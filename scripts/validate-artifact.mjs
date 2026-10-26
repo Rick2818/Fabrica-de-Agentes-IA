@@ -22,4 +22,12 @@ assert.equal(
   `${pathToFileURL(workerPath)} must export default.fetch`,
 );
 
-console.log("Artifact is valid ESM and exports default.fetch");
+// Las dos páginas deben incluir recursos bilingües y colores reales en el Site construido.
+for (const asset of ["index.html", "entrenamiento.html", "vibrant-agents.css", "i18n.js"]) {
+  assert(source.includes(JSON.stringify(asset) + ":"), "Missing production asset: " + asset);
+}
+assert(source.includes("/i18n.js"), "Missing ES/EN script in HTML");
+assert(source.includes("/vibrant-agents.css"), "Missing vibrant mascot stylesheet in HTML");
+assert(source.includes("factory.locale"), "Missing persisted language selection");
+assert(source.includes("pet-card:nth-child(6)"), "Missing complete six-character palette");
+console.log("Artifact is valid ESM, exports default.fetch, and bundles bilingual UI and six vivid mascots");
