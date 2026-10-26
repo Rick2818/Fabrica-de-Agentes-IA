@@ -178,7 +178,8 @@ export async function runNext(db,env,now=Date.now()){
    const retryInfo=data.error?.details?.find(d=>d.retryDelay)?.retryDelay;
    const retryMs=retryInfo?Math.ceil(parseFloat(retryInfo)*1000):60000;
    let delay=response.status===429?(daily?nextDay(now)-now:Math.max(60000,retryMs)):response.status>=500?60000:null;
-   if(job.attempts>=2&&response.status!==429)delay=null;
+   if(response.status>=500&&job.attempts>=4)delay=null;
+   else if(response.status!==429&&response.status<500&&job.attempts>=2)delay=null;
    const reason=response.status===429?'Google alcanzó su cuota gratuita. El encargo queda guardado para reintentar.':response.status===401||response.status===403?'Google rechazó la clave o sus permisos.':'Gemini no pudo completar el encargo (HTTP '+response.status+').';
    await failJob(db,job,token,reason,delay,Date.now());
    if(response.status===429){lockUntil=now+delay;await stmt(db,'UPDATE jobs SET attempts=MAX(0,attempts-1) WHERE id=? AND status=?',job.id,'waiting').run();if(objective)await stmt(db,'UPDATE objectives SET api_calls=MAX(0,api_calls-1) WHERE id=?',objective.id).run();}
