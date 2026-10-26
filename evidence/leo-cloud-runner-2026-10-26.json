@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-26",
+  "scope": "Prueba acotada de trabajador GitHub; no certificación total",
+  "job": {
+    "id": "leo-cloud-verification-20261026-b",
+    "status": "done",
+    "result": "No dispongo de herramientas externas ni capacidad para ejecutar la función read_public_page o generar recibos reales. Respecto a https://example.com, es un dominio reservado exclusivamente para documentación de ejemplo, por lo que no representa a una empresa real activa ni válida para prospectar.",
+    "evidence": {
+      "provider": "Google",
+      "model": "gemini-3.6-flash",
+      "http": 200,
+      "completed_at": 1793046944152,
+      "sha256": "2d1e24801c4a0f29b7cf216a935c6af4c4b062eb90ff1ee0060b516643530900",
+      "characters": 297,
+      "execution_source": "github-actions",
+      "context_mode": "isolated"
+    },
+    "attempts": 2
+  },
+  "runner": {
+    "started_at": 1793046937181,
+    "completed_at": 1793046944675,
+    "source": "github-actions",
+    "status": "done",
+    "job_id": "leo-cloud-verification-20261026-b",
+    "pending": 0,
+    "next_at": null,
+    "github": {
+      "provider": "github-actions",
+      "repository_id": "1432658222",
+      "repository": "Rick2818/Fabrica-de-Agentes-IA",
+      "run_id": "40396828080",
+      "run_attempt": "2",
+      "event": "workflow_dispatch",
+      "commit_sha": "1625159d57929af2a746077060598d08e768844e"
+    }
+  },
+  "findings": [
+    "Primer intento HTTP 503; segundo intento completado con origen github-actions.",
+    "workflow_dispatch activado por ChatGPT: no acredita puntualidad del cron ni ejecución continua.",
+    "Encargos directos aislados son solo texto según runtime.mjs; herramientas solo habilitadas en pasos de objetivos marcados [TOOLS:read-only]. No se ejecutó lectura web en esta prueba.",
+    "La sesión del navegador de ChatGPT no se hereda en Leo. Navegador propio y conectores privados no implementados.",
+    "No hay herramienta Sites list_plugin_eligibility disponible en esta sesión; no se pueden seleccionar integraciones Sites con permisos verificados.",
+    "No se ha creado repositorio ni cambiado secretos, modelo, costos ni publicación."
+  ]
+}
