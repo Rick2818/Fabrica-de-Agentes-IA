@@ -1,0 +1,88 @@
+{
+  "date": "2026-10-26",
+  "scope": "Aprobada lectura pública por llamada nativa de Gemini en encargo directo; ejecución GitHub despachada manualmente. No acredita cron puntual, navegador interactivo ni cuentas privadas.",
+  "github_commit": "70a3a23e5ab3eb71f50bcfa07f0bcfd7aea864e3",
+  "site_version": 39,
+  "site_source_commit": "f80bfef1392a07f214908910074d714cc97afc3e",
+  "site_url": "https://agente-ricardo-revision-rick.glassybell1025.chatgpt.site",
+  "job": {
+    "id": "leo-direct-live-tools-20261026-v39",
+    "status": "done",
+    "result": "El título observado es \"Example Domain\". Este dominio está reservado por IANA exclusivamente para uso en ejemplos explicativos dentro de documentación técnica. Por esta razón, no representa a ninguna entidad comercial activa ni constituye un prospecto de ventas validado. ID de recibo: leo-direct-live-tools-20261026-v39-tool-0.",
+    "context_mode": "isolated",
+    "evidence": {
+      "provider": "Google",
+      "model": "gemini-3.6-flash",
+      "http": 200,
+      "completed_at": 1793050483829,
+      "sha256": "5ae943923b5c7c4054942b8af76e9514e8e05ee22c67365c18797b30dae33a3a",
+      "characters": 328,
+      "execution_source": "github-actions",
+      "context_mode": "isolated",
+      "tool_receipts": [
+        {
+          "id": "leo-direct-live-tools-20261026-v39-tool-0",
+          "job_id": "leo-direct-live-tools-20261026-v39",
+          "operation": "read_public_page",
+          "arguments": {
+            "url": "https://example.com"
+          },
+          "output": {
+            "url": "https://example.com/",
+            "title": "Example Domain",
+            "text": "Example Domain This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.",
+            "truncated": false,
+            "bytes": 577,
+            "checked_at": 1793050457494,
+            "scope": "Lectura pública de texto; sin navegador, inicio de sesión ni verificación de afirmaciones."
+          },
+          "at": 1793050457494,
+          "source": "model_function_call",
+          "external_writes": false,
+          "sha256": "bca7ef85b2ac0d7e0e0b127f32a3cbdbe69b587f5c212b77a86ad9fb2a097682"
+        }
+      ]
+    }
+  },
+  "runner": {
+    "started_at": 1793050471265,
+    "completed_at": 1793050484177,
+    "source": "github-actions",
+    "status": "done",
+    "job_id": "leo-direct-live-tools-20261026-v39",
+    "pending": 0,
+    "next_at": null,
+    "github": {
+      "provider": "github-actions",
+      "repository_id": "1432658222",
+      "repository": "Rick2818/Fabrica-de-Agentes-IA",
+      "run_id": "40405441125",
+      "run_attempt": "1",
+      "event": "workflow_dispatch",
+      "commit_sha": "70a3a23e5ab3eb71f50bcfa07f0bcfd7aea864e3"
+    }
+  },
+  "run": {
+    "id": 40405441125,
+    "conclusion": "success",
+    "url": "https://github.com/Rick2818/Fabrica-de-Agentes-IA/actions/runs/40405441125"
+  },
+  "tests": {
+    "server": 109,
+    "runner": 8,
+    "ui_simulated": 8,
+    "public_tools": true,
+    "artifact": true,
+    "github_ci": "40405216218 success"
+  },
+  "quota": {
+    "used": 20,
+    "limit": 20
+  },
+  "remaining": [
+    "Navegador interactivo propio de Leo",
+    "Conectores con cuentas privadas",
+    "403 de consulta pública a GitHub no resuelto por la sesión del operador",
+    "No certificación de equivalencia total ni autonomía continua"
+  ]
+}
