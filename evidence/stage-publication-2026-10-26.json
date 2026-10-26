@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-26",
+  "implementation_commit": "55ef3927f5f48755c141e48e5fba662eae8c9e66",
+  "ci": {
+    "run_id": "40346876783",
+    "event": "push",
+    "conclusion": "success",
+    "tests": 126
+  },
+  "publication": {
+    "version": 37,
+    "project_id": "appgprj_6adbf0c05a0c8191b2ca585b76f5e862",
+    "version_id": "appgprj_6adbf0c05a0c8191b2ca585b76f5e862~appgver_57c73860d8c08191ad4a1fd37a6407bc",
+    "source_commit": "7cc2c9ffb9a0f97c03f40488443514f7606e4897",
+    "deployment_id": "appgdep_6adf6df76bbc8191a1688bf1f08e2ec1",
+    "status": "succeeded",
+    "env_revision": 4,
+    "url": "https://agente-ricardo-revision-rick.glassybell1025.chatgpt.site",
+    "access": "custom; unchanged"
+  },
+  "live_verification": {
+    "authenticated_browser": "passed",
+    "deep_link": "Nico selected and focused after reload; approved receipt recovered",
+    "pending": 0,
+    "ai_configured": true,
+    "scheduled_test": "qa-etapa-autonomia-20261025 completed via ChatGPT backup; matched native schedule run",
+    "physical_phone_test": "not performed",
+    "github_15_minute_cadence": "not certified"
+  },
+  "scope": "Synthetic practice certification only; private integrations, voice, singing and dancing not part of this stage"
+}
