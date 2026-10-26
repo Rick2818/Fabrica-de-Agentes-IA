@@ -1,0 +1,119 @@
+{
+  "date": "2026-10-26",
+  "scope": "Cierre de cuatro puntos del MVP; voz/canto/baile excluidos",
+  "local_tests": {
+    "server": 104,
+    "runner": 7,
+    "training_ui": 8,
+    "expression_regression": 7,
+    "total": 126,
+    "model": "simulated"
+  },
+  "access": {
+    "live_authenticated_browser": "passed",
+    "shared_access": "preserved",
+    "mobile_layout": "responsive CSS hardened; no physical phone or emulated mobile viewport test",
+    "fixes": [
+      "Block cloud profile writes until initial successful load",
+      "Refresh recovers connection without posting default templates",
+      "Six deep links select specialty after cloud load and focus its name",
+      "Minimum touch targets and narrow-screen grid sizing"
+    ]
+  },
+  "mascots": {
+    "names": [
+      "Leo",
+      "Mila",
+      "Vera",
+      "Alma",
+      "Nico",
+      "Lía"
+    ],
+    "bodies": "original SVG silhouettes with limbs",
+    "movement": "subtle CSS breathing and greeting; reduced-motion respected"
+  },
+  "specialty_reviews": [
+    {
+      "specialty": "Ventas",
+      "job_id": "b220bab8-f48f-48e9-9627-8541071ece2e",
+      "review_receipt": "5e3b92e7-e6f1-466d-8576-98b179b47469",
+      "assessment": "pass",
+      "provider_http": 200,
+      "scope": "Synthetic exercise reviewed by AI assistant; not professional or operational certification"
+    },
+    {
+      "specialty": "Servicio al cliente",
+      "job_id": "9eda7171-5eec-4e35-8ada-a9a97fa16fdb",
+      "review_receipt": "fabd2ca0-20dd-483f-a20f-a9ec86c5cf58",
+      "assessment": "pass",
+      "provider_http": 200,
+      "scope": "Synthetic exercise reviewed by AI assistant; not professional or operational certification"
+    },
+    {
+      "specialty": "Mercadeo",
+      "job_id": "8d6160d7-cd63-4746-852b-c51f17a53b88",
+      "review_receipt": "415502f7-a002-48a5-935b-0dac2b2c1a5d",
+      "assessment": "pass",
+      "provider_http": 200,
+      "scope": "Synthetic exercise reviewed by AI assistant; not professional or operational certification"
+    },
+    {
+      "specialty": "Química y farmacia",
+      "job_id": "49d6a529-4d94-4463-a93a-9d911dc05257",
+      "review_receipt": "11cb08c7-1661-4512-98c7-227e063999da",
+      "assessment": "pass",
+      "provider_http": 200,
+      "scope": "Synthetic exercise reviewed by AI assistant; not professional or operational certification"
+    },
+    {
+      "specialty": "Finanzas",
+      "job_id": "0944ac3e-edaf-48ce-9f6e-c63e74635522",
+      "review_receipt": "2b6dab82-17e9-46e6-8f3f-f499c7c771ce",
+      "assessment": "pass",
+      "provider_http": 200,
+      "scope": "Synthetic exercise reviewed by AI assistant; not professional or operational certification"
+    },
+    {
+      "specialty": "Logística",
+      "job_id": "8b1b2451-1ee6-4e52-b047-ae8451b03664",
+      "review_receipt": "ff49aad5-2640-4502-b2e0-529ec3833661",
+      "assessment": "pass",
+      "provider_http": 200,
+      "scope": "Synthetic exercise reviewed by AI assistant; not professional or operational certification"
+    }
+  ],
+  "logistics": {
+    "tool_receipt": "47d608c0-1776-403b-9eee-0c6bc8c2e52d",
+    "tool_sha256": "8713eb7fd630a76849d25fe20cb2be61090a8fcffdcd09d39c556728da7e37a1",
+    "result_sha256": "1a87f347f5c431dec1c08f139760b5d8744b5c889f8e647865c2b958a10d31a4",
+    "days_cover": 4,
+    "reorder_point": 40,
+    "reorder_quantity": 35,
+    "attempts": 1
+  },
+  "autonomy": {
+    "job_id": "qa-etapa-autonomia-20261025",
+    "status": "done",
+    "attempts": 3,
+    "source": "scheduled-mcp",
+    "cycle_id": "3fbfd36e-0f84-8331-999b-7baf8b5733bf",
+    "schedule_id": "6adbf94d28e8819189c0516c6068457a",
+    "completed_at": 1792966904627,
+    "sha256": "29d1fbe87d597b233688662aa720c4e8de739dde52c2db54df1ee763641f3188",
+    "scheduler_evidence": "Native Automations.peek latest_result.run_id matches cycle_id",
+    "github_schedule_run": "40328917619",
+    "github_event": "schedule",
+    "github_conclusion": "success",
+    "github_commit": "eb15694c1c0618bccd7d7b81265a2f0fbc3d2b25",
+    "latest_backup_run": "eba3ce8a-1370-832d-8e0b-51a2c8524066",
+    "latest_backup_status": "no_update",
+    "latest_backup_enabled": true,
+    "pending": 0,
+    "limits": [
+      "Physical laptop power state not observable",
+      "GitHub intervals not guaranteed",
+      "Completed AI delivery proved by ChatGPT backup, not GitHub alone",
+      "Gemini private integrations remain disconnected"
+    ]
+  }
+}

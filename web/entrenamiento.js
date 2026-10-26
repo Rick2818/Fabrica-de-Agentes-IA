@@ -9,13 +9,13 @@ const uid=()=>crypto.randomUUID();
 const active=p=>p?.practice&&['queued','running','waiting'].includes(p.practice.status);
 let data;try{const parsed=JSON.parse(localStorage.getItem(KEY));data=Array.isArray(parsed)?parsed.filter(x=>x&&typeof x.id==='string'&&fields.every(f=>typeof x[f]==='string')).slice(0,100):null}catch{}
 if(!data?.length)data=defaults.map(x=>({...x,id:uid(),history:[]}));
-let selected=data[0].id,timer=null,polling=false,starting=false,salesSkill=null,specialtyCatalog=null,registrationRows=[];
+let selected=data[0].id,timer=null,polling=false,starting=false,salesSkill=null,specialtyCatalog=null,registrationRows=[],cloudReady=false;
 const current=()=>data.find(x=>x.id===selected);
 function notice(t){$('status').textContent=t;}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(data));return true}catch{notice('No se pudo guardar la copia local.');return false}}
 async function api(path,body){const res=await fetch(path,{cache:'no-store',...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let value;try{value=await res.json()}catch{throw Error('Tu sesión pudo haber vencido. Abrí la Fábrica con tu cuenta de ChatGPT y volvé a intentar.')}if(!res.ok)throw Error(value.error||'No se pudo completar la operación.');return value}
-async function cloudSave(){await api('/api/training/profiles',{profiles:data.map(p=>({...Object.fromEntries(['id',...fields].map(f=>[f,p[f]])),history:(p.history||[]).slice(-30)}))});for(const p of data)p.dirty=false;persist()}
-async function cloudLoad(){try{const result=await api('/api/training/profiles');if(result.profiles?.length){data=result.profiles;if(!data.some(p=>p.id===selected))selected=data[0].id;for(const p of data)acceptPractice(p,p.practice);persist();render();notice('Perfiles y recibos recuperados desde la nube.')}else{render();notice('Plantillas iniciales listas; guardalas en la nube.')}}catch(e){notice('La copia local se conserva. '+e.message)}}
+async function cloudSave(){if(!cloudReady)throw Error('Primero recuperá tus fichas con «Actualizar fichas y resultados». La copia local se conserva.');await api('/api/training/profiles',{profiles:data.map(p=>({...Object.fromEntries(['id',...fields].map(f=>[f,p[f]])),history:(p.history||[]).slice(-30)}))});for(const p of data)p.dirty=false;persist()}
+async function cloudLoad(){try{const result=await api('/api/training/profiles');if(!Array.isArray(result.profiles))throw Error('La respuesta de fichas está incompleta.');cloudReady=true;if(result.profiles.length){data=result.profiles;if(!data.some(p=>p.id===selected))selected=data[0].id;for(const p of data)acceptPractice(p,p.practice);persist();render();notice('Perfiles y recibos recuperados desde la nube.')}else{render();notice('Plantillas iniciales listas; guardalas en la nube.')}return true}catch(e){notice('La copia local se conserva. '+e.message);return false}}
 async function cloudSync(){try{await cloudSave();notice('Perfiles guardados en la nube.');return true}catch(e){notice('La copia local se conserva. '+e.message);return false}}
 function acceptPractice(p,practice){p.practice=practice;if(practice?.status==='done'&&typeof practice.answer==='string'&&!practice.stale&&!p.dirty){p.answer=practice.answer;p.assessment=practice.receipt?.assessment||'pending';p.requestId=null}}
 function badge(p){if(p.dirty||p.practice?.stale)return 'Cambios pendientes de una nueva práctica';if(p.practice?.approval==='approved')return 'Aprobado para el alcance probado · revisión manual';if(p.practice?.approval==='needs_improvement')return 'Necesita mejoras';return 'Pendiente de práctica o revisión'}
@@ -28,7 +28,7 @@ for(const f of fields.filter(x=>!['answer','assessment'].includes(x)))$(f).addEv
 $('new').onclick=()=>{sync();const p={id:uid(),name:'Nuevo agente',specialty:'Otra',mission:'',knowledge:'',tools:'',scenario:'',criteria:'',answer:'',assessment:'pending',history:[]};data.push(p);selected=p.id;persist();render();cloudSync()};
 $('save').onclick=async()=>{sync();if(!current().name.trim())return notice('Ingresá un nombre.');persist();if(await cloudSync())await cloudLoad()};
 $('practice').onclick=async()=>{if(starting||active(current()))return;sync();const p=current();if(!p.mission.trim()||!p.scenario.trim()||!p.criteria.trim())return notice('Completá misión, escenario y criterios.');starting=true;renderResult();try{await cloudSave();p.requestId=p.requestId||uid();persist();const run=await api('/api/training/practice',{profile_id:p.id,request_id:p.requestId});acceptPractice(p,{job_id:run.job_id,status:run.status,attempts:0,approval:'pending',scope:'Redacción en simulaciones; sin acciones externas.'});p.answer='';p.assessment='pending';persist();if(p.id===selected){$('answer').value='';$('assessment').value='pending'}notice('Práctica iniciada. La respuesta aparecerá aquí, incluso si cerrás y volvés después.');schedulePoll(1000)}catch(e){notice('No se pudo confirmar la práctica. Podés volver a intentar sin duplicar la solicitud. '+e.message)}finally{starting=false;renderResult()}};
-$('refresh').onclick=async()=>{sync();if(await cloudSync()){await cloudLoad()}};
+$('refresh').onclick=async()=>{if(!cloudReady){if(await cloudLoad()){await loadSpecialties();selectRequestedSpecialty()}return}sync();if(await cloudSync()){await cloudLoad()}};
 $('retry').onclick=async()=>{const p=current();try{await api('/api/retry',{id:p.practice.job_id});p.practice.status='queued';renderResult();schedulePoll(1000);notice('Reintento solicitado para la misma práctica.')}catch(e){notice(e.message)}};
 $('evaluate').onclick=async()=>{sync();const p=current();try{await cloudSave();await api('/api/training/evaluate',{profile_id:p.id,job_id:p.practice?.job_id,assessment:p.assessment,feedback:p.feedback});await cloudLoad();notice('Revisión guardada con respuesta, criterios y recibo. La aprobación corresponde solo al alcance probado.')}catch(e){notice('No se registró la revisión. '+e.message)}};
 $('delete').onclick=()=>{if(data.length===1)return notice('Conservá al menos un perfil.');if(!confirm('¿Eliminar esta ficha? Los recibos de prácticas anteriores se conservan.'))return;data=data.filter(p=>p.id!==selected);selected=data[0].id;persist();render();cloudSync()};
@@ -67,12 +67,15 @@ $('prepare-registration').onclick=()=>$('run-specialty-tool').onclick();
 async function loadSpecialties(){try{specialtyCatalog=await api('/api/training/specialties');renderSpecialty()}catch(e){notice('No se pudo cargar el catálogo de especialidades. '+e.message)}}
 function selectRequestedSpecialty(){
  if(typeof location==='undefined')return;
+ if(!cloudReady)return;
  const requested=new URLSearchParams(location.search).get('especialidad');
  if(requested===null||!/^\d$/.test(requested))return;
  const specialty=Object.keys(mascotNames)[Number(requested)];if(!specialty)return;
  const existing=data.find(p=>p.specialty===specialty&&p.name===mascotNames[specialty])||data.find(p=>p.specialty===specialty);
  if(existing){selected=existing.id;render();notice('Elegiste a '+mascotNames[specialty]+' · '+specialty+'.');}
  else if(specialtyCatalog){$('template-specialty').value=specialty;$('create-template').onclick();}
+ $('name').scrollIntoView?.({block:'center',behavior:'instant'});
+ $('name').focus?.({preventScroll:true});
 }
 render();Promise.all([cloudLoad(),loadSpecialties()]).then(selectRequestedSpecialty);loadSalesSkill();
 

@@ -1,3 +1,13 @@
+## Estado vigente — revisión 26-10-2026
+
+Esta sección actualiza las notas históricas inferiores. Los cuatro puntos de la etapa son acceso móvil, seis mascotitas, prácticas de especialidad y ejecución en nube con recibos. Evidencia: `evidence/stage-review-2026-10-26.json`.
+
+- Acceso autenticado productivo comprobado en navegador. Se corrigió un fallo de inicio que permitía guardar plantillas locales antes de recuperar las fichas de nube; la recuperación ahora carga primero. Los seis enlaces eligen y enfocan su ficha. CSS ajustado para pantallas estrechas y controles táctiles. No se hizo prueba en teléfono físico ni emulación de viewport móvil; esa comprobación queda expresamente sin acreditar.
+- Leo, Mila, Vera, Alma, Nico y Lía conservan siluetas propias con extremidades. Se añadió movimiento sutil y saludo por interacción, con respeto a movimiento reducido.
+- Las seis especialidades tienen respuesta real de Gemini HTTP 200 y recibo de revisión acotada. Se recuperaron cuatro revisiones existentes y se completaron Finanzas y Logística. La aprobación corresponde al ejercicio sintético, no a toda la profesión ni a conexiones privadas.
+- La prueba `qa-etapa-autonomia-20261025` terminó en el ciclo nativo `3fbfd36e-0f84-8331-999b-7baf8b5733bf` del respaldo ChatGPT. Se contrastó con Automations.peek. GitHub registra el evento schedule 40328917619, success, con recibo coincidente en Site. La entrega de IA la acredita el respaldo, no ese ciclo vacío de GitHub. El respaldo sigue habilitado y su ciclo más reciente coincide con el recibo eba3ce8a-1370-832d-8e0b-51a2c8524066. Cola ejecutable vacía. No se garantiza frecuencia de 15 minutos ni puede observarse el encendido físico de la laptop.
+- 126 comprobaciones locales aprobadas (104 servidor, 7 runner, 8 interfaz, 7 regresión de expresión). Gemini simulado en pruebas locales; las respuestas productivas se identifican por separado.
+
 # Continuidad y avisos de Fábrica de Agentes IA
 
 ## Mecanismo implementado y estado actual
