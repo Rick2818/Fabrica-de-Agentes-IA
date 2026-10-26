@@ -31,5 +31,5 @@ assert(source.includes("/vibrant-agents.css"), "Missing vibrant mascot styleshee
 assert(source.includes("factory.locale"), "Missing persisted language selection");
 assert(source.includes("/mascot-expressions.js"), "Missing mascot controls in pages");
 assert(source.includes("pet-dancing"), "Missing mascot movement styles");
-assert(source.includes("pet-card:nth-child(6)"), "Missing complete six-character palette");
-console.log("Artifact is valid ESM, exports default.fetch, and bundles bilingual UI and six vivid mascots");
+assert(source.includes("pet-shell:nth-child(6)"), "Missing complete six-character palette");
+console.log("Artifact is valid ESM, exports default.fetch, and bundles bilingual UI and six metallic mascots with voice and motion");
