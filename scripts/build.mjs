@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const assets=Object.fromEntries(['index.html','style.css','app.js','entrenamiento.html','entrenamiento.css','entrenamiento.js','expression.js','expression-player.js','expression.css','mascotas.css','vibrant-agents.css','i18n.js','mascot-expressions.css','mascot-expressions.js','agent-status.css','agent-status.js'].map(name=>[name,readFileSync(resolve(root,'web',name),'utf8')]));
 let runtime=readFileSync(resolve(root,'worker/runtime.mjs'),'utf8');
-for(const [file,names] of [['expression',['EXPRESSION_SKILLS','expressionScore']],['sales-prospecting',['SALES_PROSPECTING_SKILL']],['specialty-skills',['SPECIALTY_SKILLS','selectedSpecialtySkills','SPECIALTY_TOOLKITS']],['specialist-tools',['specialistTool','SPECIALIST_OPERATIONS']]]){
+for(const [file,names] of [['expression',['EXPRESSION_SKILLS','expressionScore']],['sales-prospecting',['SALES_PROSPECTING_SKILL']],['specialty-skills',['SPECIALTY_SKILLS','selectedSpecialtySkills','SPECIALTY_TOOLKITS']],['specialist-tools',['specialistTool','SPECIALIST_OPERATIONS']],['leo-public-tools',['leoPublicTool']]]){
  const imported=new RegExp("import \\{[^}]+\\} from '\\./"+file+"\\.mjs';");
  runtime=runtime.replace(imported,()=>readFileSync(resolve(root,'worker',file+'.mjs'),'utf8').replace("import {planSVRegistration} from './sv-registration.mjs';",readFileSync(resolve(root,'worker/sv-registration.mjs'),'utf8')).replace(/export (const|async function|function) /g,'$1 '));
 }
