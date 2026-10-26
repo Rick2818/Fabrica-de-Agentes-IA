@@ -1,0 +1,16 @@
+{
+  "scope": "Local, SQLite real y Gemini simulado; no certifica ejecuci\u00f3n live",
+  "server_tests": 109,
+  "cloud_runner_tests": 8,
+  "checks": [
+    "lectura optativa en encargos directos",
+    "aislamiento de memoria",
+    "reanudaci\u00f3n de recibos tras reinicio sin repetir HTTP",
+    "preservaci\u00f3n de firma Gemini",
+    "idempotencia y conflicto de permiso",
+    "denegaci\u00f3n de herramientas sin permiso",
+    "reanudaci\u00f3n tools_saved en el mismo trabajador con espera",
+    "artefacto ESM v\u00e1lido"
+  ],
+  "live_status": "pending"
+}

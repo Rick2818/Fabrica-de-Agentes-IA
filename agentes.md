@@ -121,3 +121,10 @@ Se implementa function calling nativo de Gemini sin cambiar modelo ni facturaci�
 No es un navegador interactivo: no ejecuta JavaScript, inicia sesión, rellena formularios ni hereda conectores de ChatGPT. El entorno no expone list_plugin_eligibility, requisito de Sites para declarar conectores externos; quedan pendientes y no se simulan. No se afirma paridad con Dots. Los ensayos locales simulan Gemini; la prueba en producción se registra por separado.
 
 Referencia de protocolo, sin copiar código privado: https://ai.google.dev/gemini-api/docs/function-calling . Referencia funcional: https://learn.chatgpt.com/docs/dots/computers-and-apps . Implementación propia.
+
+
+## Encargos directos con lectura pública — 26-10-2026
+
+La casilla «Leo: permitir lectura pública y calificación de ventas» antepone `[TOOLS:read-only]` y un salto de línea al encargo. También se admite ese prefijo en `create_task.prompt`. La memoria continúa aislada salvo elección independiente. Las funciones, recibos persistentes y reanudación son las mismas que en objetivos. Sin el prefijo no se habilitan herramientas. El trabajador GitHub retoma `tools_saved` dentro de sus límites; no reintenta inmediatamente errores 503 ni cuotas. Esto no concede navegador interactivo, cuentas privadas, correo ni escrituras.
+
+Validación local: 109 pruebas de servidor y 8 del trabajador; Gemini simulado. Prueba live posterior a publicación pendiente.

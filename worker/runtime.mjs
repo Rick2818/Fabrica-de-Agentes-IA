@@ -170,10 +170,16 @@ export async function runNext(db,env,now=Date.now()){
   if(!contents.length)contents=[{role:'user',parts:[{text:job.input}]}];
   let instruction=isolated?'Sos un asistente de texto. Respondé en español breve y claro. Trabajá únicamente con el texto de este encargo. No tenés memoria ni herramientas externas. No inventés comprobaciones. Devolvé JSON con reply (el resultado completo), notes y tasks (listas vacías).':system,outputSchema=schema;
   if(objective){const prepared=await objectiveRequest(db,objective,job);instruction=prepared.instruction;contents=prepared.contents;outputSchema=prepared.schema;}
-  const toolEnabled=!!objective&&objective.description.includes('[TOOLS:read-only]');
+  // Read-only access is explicit and independent from saved-memory access.
+  const directTools=!objective&&job.kind==='task'&&job.input.startsWith('[TOOLS:read-only]\n');
+  const toolEnabled=objective?objective.description.includes('[TOOLS:read-only]'):directTools;
   const toolKey='agent_tool_state:'+job.id;
   const toolState=toolEnabled?await trainingGet(db,toolKey):null;
-  const selectingTools=toolEnabled&&job.phase==='step'&&!toolState;
+  const selectingTools=toolEnabled&&(!objective||job.phase==='step')&&!toolState;
+  if(directTools){
+   instruction=isolated?instruction.replace('No tenés memoria ni herramientas externas.','No tenés memoria guardada.'):instruction.replace('No tenés navegación, correo, pagos ni otras acciones externas.','No tenés navegador interactivo, correo, pagos ni escrituras externas.');
+   instruction+='\n'+AGENT_TOOL_INSTRUCTION;
+  }
   if(selectingTools)instruction+=' Si no necesitás una función, devolvé JSON {reply,notes:[],tasks:[]}.';
   if(toolEnabled)instruction=instruction.replace(objectiveSystem,objectiveSystem.replace('Tus herramientas en esta versión son generación de texto, memoria y cola persistente. NO tenés navegador, correo, acceso a otras aplicaciones, pagos ni ejecución de software.',AGENT_TOOL_INSTRUCTION));
   if(toolState){contents=[...contents,toolState.model_content,{role:'user',parts:toolState.responses}];}
@@ -335,7 +341,7 @@ const toolList=[
  {name:'record_scheduler_check',description:'Guardar una comprobación real del programador obtenida con Automations. No activa ni certifica por sí misma una programación. Genera un aviso persistente ante pausa, fallo o acción requerida.',inputSchema:{type:'object',properties:{schedule_id:{type:'string'},is_enabled:{type:'boolean'},requires_user_action:{type:'boolean'},status:{type:'string',enum:['completed','in_progress','failed','no_update','unknown']},run_id:{type:'string'},started_at:{type:'integer'},completed_at:{type:'integer'}},required:['schedule_id','is_enabled','requires_user_action','status']}},
  {name:'acknowledge_notifications',description:'Registrar que se anunció un aviso en ChatGPT después de emitir su contenido. Este acuse no significa que Rick lo leyó. La lectura solo se confirma desde la bandeja del agente.',inputSchema:{type:'object',properties:{ids:{type:'array',items:{type:'string'}}},required:['ids']}},
  {name:'send_message',description:'Conversar con Fábrica de Agentes IA y guardar el intercambio. Reutilizar id para evitar duplicados.',inputSchema:{type:'object',properties:{id:{type:'string'},message:{type:'string'}},required:['id','message']}},
- {name:'create_task',description:'Guardar un encargo directo; por defecto usa solo su texto, sin memoria guardada. use_saved_context=true incorpora memoria. Ejecuta el primer trabajo disponible y reutiliza id sin duplicar.',inputSchema:{type:'object',properties:{id:{type:'string'},title:{type:'string'},prompt:{type:'string'},due_at:{type:'integer'},use_saved_context:{type:'boolean'}},required:['id','title','prompt']}},
+ {name:'create_task',description:'Guardar un encargo directo; por defecto usa solo su texto, sin memoria guardada. use_saved_context=true incorpora memoria. El prefijo [TOOLS:read-only] seguido de salto de línea permite lectura pública sin memoria adicional. Ejecuta el primer trabajo disponible y reutiliza id sin duplicar.',inputSchema:{type:'object',properties:{id:{type:'string'},title:{type:'string'},prompt:{type:'string'},due_at:{type:'integer'},use_saved_context:{type:'boolean'}},required:['id','title','prompt']}},
  {name:'save_note',description:'Guardar o actualizar una preferencia por su título en la memoria real de Fábrica de Agentes IA.',inputSchema:{type:'object',properties:{title:{type:'string'},content:{type:'string'}},required:['title','content']}},
  {name:'register_cloud_schedule',description:'Registrar en el tablero la programación en la nube, únicamente después de crearla o verificarla con Sites. No crea ni activa una tarea programada por sí misma.',inputSchema:{type:'object',properties:{id:{type:'string'},schedule:{type:'string'},enabled:{type:'boolean'},check:{type:'object',properties:{schedule_id:{type:'string'},is_enabled:{type:'boolean'},requires_user_action:{type:'boolean'},status:{type:'string'},run_id:{type:'string'},started_at:{type:'integer'},completed_at:{type:'integer'}}}},required:['id','schedule','enabled']}}
 ];

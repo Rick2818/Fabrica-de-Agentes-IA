@@ -184,5 +184,26 @@ await test('Lector público bloquea redes internas, parámetros, redirecciones y
  await assert.rejects(()=>readPublicPage('https://example.com',async()=>new Response('',{status:302,headers:{location:'http://127.0.0.1'}})),/redirige/);
  await assert.rejects(()=>readPublicPage('https://example.com',async()=>new Response('a'.repeat(150001),{headers:{'content-type':'text/plain'}})),/límite/);
 });
+await test('Encargo directo: herramientas optativas sin filtrar memoria y reanudación tras reinicio',async()=>{
+ const folder=mkdtempSync(join(tmpdir(),'leo-direct-'));const file=join(folder,'state.sqlite');let local=new D1(file);local.db.exec(migration);
+ try{
+  await local.prepare('INSERT INTO notes VALUES(?,?,?)').bind('Privada','PRIVATE-MEMORY-SENTINEL',now).run();
+  const input={id:'leo-direct-read',kind:'task',title:'Lectura pública',text:'[TOOLS:read-only]\nLeé https://example.com y explicá qué es.'};await enqueue(local,input,now);
+  let reads=0;globalThis.fetch=async(url,options)=>{
+   if(String(url).includes('example.com')){reads++;return new Response('<title>Example Domain</title><p>Example</p>',{headers:{'content-type':'text/html'}})}
+   const body=JSON.parse(options.body);assert(body.tools);assert(!options.body.includes('PRIVATE-MEMORY-SENTINEL'));assert(!options.body.includes('No tenés memoria ni herramientas externas.'));
+   return Response.json({candidates:[{content:{role:'model',parts:[{functionCall:{name:'read_public_page',id:'direct-read',args:{url:'https://example.com'}},thoughtSignature:'direct-signature'}]}}]});
+  };
+  assert.equal((await runNext(local,env,now)).reason,'tools_saved');local.db.close();local=new D1(file);
+  globalThis.fetch=async(url,options)=>{assert(!String(url).includes('example.com'));const b=JSON.parse(options.body);assert(!b.tools);assert(!options.body.includes('PRIVATE-MEMORY-SENTINEL'));assert.equal(b.contents.at(-2).parts[0].thoughtSignature,'direct-signature');assert.equal(b.contents.at(-1).parts[0].functionResponse.response.output.title,'Example Domain');return answer('Example Domain, recibo leo-direct-read-tool-0');};
+  assert.equal((await runNext(local,env,now+14000)).status,'done');const b=await board(local);const j=b.jobs.find(j=>j.id===input.id);const e=JSON.parse(j.evidence);assert.equal(e.context_mode,'isolated');assert.equal(e.tool_receipts[0].id,'leo-direct-read-tool-0');assert.equal(reads,1);
+  await enqueue(local,input,now);assert.equal((await board(local)).jobs.length,1);await assert.rejects(()=>enqueue(local,{...input,text:input.text.replace('[TOOLS:read-only]\n','')},now),{status:409});
+ }finally{local.db.close();rmSync(folder,{recursive:true,force:true})}
+});
+await test('Encargo sin permiso no puede activar herramientas al mencionarlas ni aceptar llamadas del modelo',async()=>{
+ const local=new D1();local.db.exec(migration);await enqueue(local,{id:'direct-no-tools',kind:'task',title:'Sin permiso',text:'Explicá el marcador [TOOLS:read-only] sin navegar.'},now);
+ let calls=0;globalThis.fetch=async(url,options)=>{calls++;assert(String(url).includes('googleapis'));assert(!JSON.parse(options.body).tools);return Response.json({candidates:[{content:{parts:[{functionCall:{name:'read_public_page',args:{url:'https://example.com'}}}]}}]})};
+ assert.equal((await runNext(local,env,now)).status,'error');assert.equal(calls,1);assert.notEqual((await board(local)).jobs[0].status,'done');
+});
 globalThis.fetch=originalFetch;
 console.log(JSON.stringify({passed:checks.length,scope:'Local SQL real; Gemini simulado para fallos, cancelación y recuperación.',checks}));

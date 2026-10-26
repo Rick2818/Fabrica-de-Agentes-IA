@@ -16,8 +16,9 @@ export async function runCloudQueue(config,{fetcher=fetch,sleep=ms=>new Promise(
   last={status:run.status,pending:receipt.pending,completed_at:receipt.completed_at};log(last);
   if(run.status==='done')phases++;
   if(['failed','error','unconfigured'].includes(run.status))throw Error('Ejecución detenida: '+run.status);
-  if(['quota','waiting','needs_input','idle','paused'].includes(run.status)||receipt.pending===0)return {...last,phases};
-  if(!['done','cancelled','busy'].includes(run.status))throw Error('Estado del ejecutor desconocido.');
+  const resumeTools=run.status==='waiting'&&run.reason==='tools_saved';
+  if((['quota','waiting','needs_input','idle','paused'].includes(run.status)&&!resumeTools)||receipt.pending===0)return {...last,phases};
+  if(!resumeTools&&!['done','cancelled','busy'].includes(run.status))throw Error('Estado del ejecutor desconocido.');
   const delay=Math.max(0,(receipt.next_at||now())-now());
   if(delay>30000||now()+delay+35000>deadline)return {...last,phases};
   if(delay)await sleep(delay+150);
