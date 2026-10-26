@@ -12,11 +12,11 @@ Fuentes oficiales:
 ## Cómo ejecutarlo en entorno aislado
 
 ```bash
-npm install @openai/agents
+npm install @openai/agents zod
 OPENAI_API_KEY=... node examples/official-agents-sdk/dots-pattern.mjs
 ```
 
-El archivo sólo se ejecuta manualmente con una cuenta y cuota de API independiente. **NO se instala ni ejecuta en producción por defecto**; no cambia Gemini, Site ni datos de clientes, y no requiere que el usuario facilite claves en el chat. `MemorySession` no persiste entre procesos. Para producción integrar primero almacenamiento persistente con la interfaz Session documentada, controles de aprobación, herramientas MCP autorizadas, sandbox y pruebas con recibos. No atribuir a Dots capacidades no verificadas.
+Para validar sin clave ni cargos: `node --experimental-vm-modules examples/official-agents-sdk/test-pattern.mjs` (dobles de prueba; no certifica la API).\n\nEl archivo sólo se ejecuta manualmente con una cuenta y cuota de API independiente. **NO se instala ni ejecuta en producción por defecto**; no cambia Gemini, Site ni datos de clientes, y no requiere que el usuario facilite claves en el chat. `MemorySession` no persiste entre procesos. Para producción integrar primero almacenamiento persistente con la interfaz Session documentada, controles de aprobación, herramientas MCP autorizadas, sandbox y pruebas con recibos. No atribuir a Dots capacidades no verificadas.
 
 ## Paridad
 
