@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-27",
+  "site": "appgprj_6adbf0c05a0c8191b2ca585b76f5e862",
+  "version": 47,
+  "site_source": "a8feb6fe6bd3a83ac2fd8fae911436efba7ef25c",
+  "deployment": "appgdep_6ae121fe83ec8191a281495fede81ceb",
+  "deployment_status": "succeeded",
+  "env_revision": 5,
+  "github_commit": "003eed3c25cd71cae40a19c3777ed7305ff26611",
+  "checks": [
+    "Original Site link opens /leo-crm.html",
+    "Site owner identity bound and CRM connected",
+    "Spanish and English labels checked",
+    "Browser creates synthetic draft order #2",
+    "Order and opportunity appear in browser",
+    "Browser retrieves #2 with synthetic customer name",
+    "Database independently verifies linked contact, opportunity, draft order and one activity",
+    "Synthetic records removed after test; all four customer-data tables empty",
+    "Security advisors: no findings"
+  ],
+  "scope": "CRM adapter only; general chat, external messaging, payments and autonomous sales not certified"
+}
