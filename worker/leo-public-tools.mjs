@@ -36,3 +36,4 @@ export async function leoPublicTool(kind,input,fetcher=fetch){
  }
  return {kind,url,output,source:'HTTP GET real (lectura pública), sin permiso de escritura',external_actions:false,verified_http:response.status,at:new Date().toISOString()};
 }
+

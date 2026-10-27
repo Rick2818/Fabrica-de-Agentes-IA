@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-27T22:11:19.425Z",
+  "status": "passed",
+  "scope": "Synthetic fixtures only; no messages, sales or payments",
+  "order_number": 1,
+  "request_id": "6f559d30-20b0-4d98-aee4-fe018e921948",
+  "checks": [
+    "live authenticated bridge and scoped membership",
+    "unapproved identity denied",
+    "email cannot replace bound identity",
+    "contact, opportunity, draft order and activity written atomically",
+    "retry returns same order number",
+    "changed retry payload rejected",
+    "order read back with associated contact",
+    "other company cannot list or retrieve order",
+    "read-only member cannot create orders",
+    "one persisted order after retry",
+    "public unauthenticated function request denied"
+  ],
+  "cleanup": "completed: synthetic contacts, opportunities, orders, activities and memberships removed; zero customer records"
+}

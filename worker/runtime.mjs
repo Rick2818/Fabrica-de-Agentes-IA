@@ -1,6 +1,7 @@
 import {AGENT_TOOL_DECLARATIONS,AGENT_TOOL_INSTRUCTION,readPublicPage} from './agent-tools.mjs';
 import {SALES_PROSPECTING_SKILL} from './sales-prospecting.mjs';
 import {leoPublicTool} from './leo-public-tools.mjs';
+import {leoCRM} from './leo-crm.mjs';
 import {EXPRESSION_SKILLS,expressionScore} from './expression.mjs';
 import {SPECIALTY_SKILLS,selectedSpecialtySkills,SPECIALTY_TOOLKITS} from './specialty-skills.mjs';
 import {specialistTool,SPECIALIST_OPERATIONS} from './specialist-tools.mjs';
@@ -528,6 +529,7 @@ export default {async fetch(request,env,ctx){
    if(!request.headers.get('oai-authenticated-user-id'))return json({error:'Iniciá sesión con ChatGPT para continuar.'},401);
    if(!env.DB)return json({error:'El almacenamiento todavía no está disponible.'},503);
    if(!['GET','HEAD'].includes(request.method)&&request.headers.get('origin')!==url.origin)return json({error:'Origen no permitido.'},403);
+   if(url.pathname==='/api/agents/leo/crm')return await leoCRM(request,env);
    if(url.pathname==='/api/opportunities'&&request.method==='GET')return json(await commercialBoard(env.DB));
    if(url.pathname==='/api/expression/skills'&&request.method==='GET')return json({skills:EXPRESSION_SKILLS});
    if(url.pathname==='/api/expression/score'&&request.method==='POST')return json(await saveExpression(env.DB,await parse(request)));
@@ -678,6 +680,6 @@ export default {async fetch(request,env,ctx){
   if(url.pathname==='/favicon.ico')return new Response(null,{status:204});
   const asset=url.pathname==='/'?'index.html':url.pathname.slice(1);
   if(!Object.hasOwn(assets,asset))return new Response('No encontrado',{status:404});
-  return new Response(assets[asset],{headers:{'content-type':asset.endsWith('.css')?'text/css':asset.endsWith('.js')?'text/javascript':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'same-origin','content-security-policy':"default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; object-src 'none'"}});
+  return new Response(assets[asset],{headers:{'content-type':asset.endsWith('.css')?'text/css':asset.endsWith('.js')?'text/javascript':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'same-origin','content-security-policy':"default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; media-src 'self' blob: data:; worker-src 'self' blob:; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://huggingface.co https://*.huggingface.co https://*.hf.co; base-uri 'none'; object-src 'none'"}});
  }catch(e){return json({error:e.status?e.message:'No pude completar la operación. Tus datos guardados se conservan.'},e.status||500);}
 }};

@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {leoCRM} from '../worker/leo-crm.mjs';
+import {handleCRM} from '../supabase/functions/leo-crm/handler.mjs';
+import worker from '../worker/runtime.mjs';
+import {createHash} from 'node:crypto';
+const endpoint='https://site.test/api/agents/leo/crm',key='a'.repeat(64),env={LEO_CRM_BRIDGE_KEY:key};
+const headers={'oai-authenticated-user-id':'trusted-user','oai-authenticated-user-email':'trusted@example.invalid',origin:'https://site.test','content-type':'application/json'};
+const req=(data,h=headers)=>new Request(endpoint,{method:'POST',headers:h,body:JSON.stringify(data)});
+const order={id:crypto.randomUUID(),customer:'Prueba',title:'Prueba',details:'Solo prueba',total:'10.00',currency:'USD'};
+const realFetch=globalThis.fetch,checks=[];
+try{
+ let calls=0;
+ globalThis.fetch=async(url,options)=>{calls++;assert.equal(url,'https://udispwzwrebjkanudcoy.supabase.co/functions/v1/leo-crm');const a=JSON.parse(options.body);assert.equal(a.user_id,'trusted-user');assert.equal(a.email,'trusted@example.invalid');assert.equal(a.data.id,order.id);assert.equal(options.headers['x-leo-bridge-key'],key);return Response.json({order:{order_number:1,status:'draft'}})};
+ assert.equal((await leoCRM(req({action:'create_order',data:order},{}),env)).status,401);
+ assert.equal((await leoCRM(req({action:'create_order',data:order},{...headers,origin:'https://evil.test'}),env)).status,403);
+ assert.equal((await leoCRM(req({action:'create_order',data:order}),{})).status,503);
+ assert.equal((await leoCRM(req({action:'list',organization_id:'forged'}),env)).status,400);
+ assert.equal((await leoCRM(req({action:'create_order',data:{...order,organization_id:'forged'}}),env)).status,400);
+ assert.equal((await leoCRM(new Request(endpoint+'?action=create_order',{headers}),env)).status,400);
+ assert.equal((await leoCRM(req({action:'create_order',data:{...order,total:'-1'}}),env)).status,400);
+ assert.equal(calls,0);checks.push('identity, CSRF, configuration and tenant injection rejected before network');
+ assert.equal((await leoCRM(req({action:'create_order',data:order}),env)).status,200);assert.equal(calls,1);checks.push('trusted Site identity forwarded; client request UUID preserved');
+ const routed=await worker.fetch(req({action:'create_order',data:order}),{...env,DB:{}},{});assert.equal(routed.status,200);checks.push('original Site runtime routes to adapter');
+ globalThis.fetch=async()=>{throw Error('network secret internal')};const failure=await leoCRM(req({action:'create_order',data:order}),env);assert.equal(failure.status,502);assert(!JSON.stringify(await failure.json()).includes('network secret'));checks.push('uncertain upstream response never claims success or leaks details');
+ const config={keyHash:createHash('sha256').update(key).digest('hex'),url:'https://database.test',serviceKey:'server-only'};
+ const edge=(a,k=key)=>new Request('https://function.test',{method:'POST',headers:{'x-leo-bridge-key':k},body:JSON.stringify(a)});
+ const input={site_id:'appgprj_6adbf0c05a0c8191b2ca585b76f5e862',user_id:'trusted-user',email:'trusted@example.invalid',action:'status'};
+ assert.equal((await handleCRM(edge(input,'b'.repeat(64)),config)).status,401);
+ assert.equal((await handleCRM(edge({...input,site_id:'another-site'}),config)).status,400);checks.push('Edge Function authenticates its own credential and rejects another Site');
+ globalThis.fetch=async(url,options)=>{assert.equal(url,'https://database.test/rest/v1/rpc/crm_leo_site_action');assert.equal(options.headers.apikey,'server-only');return Response.json({code:'PT403',message:'No tenés acceso.'},{status:403})};assert.equal((await handleCRM(edge(input),config)).status,403);checks.push('database authorization failures preserved');
+ console.log(JSON.stringify({status:'passed',checks},null,2));
+}finally{globalThis.fetch=realFetch;}

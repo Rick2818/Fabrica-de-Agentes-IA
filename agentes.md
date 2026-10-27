@@ -127,4 +127,12 @@ Referencia de protocolo, sin copiar código privado: https://ai.google.dev/gemin
 
 La casilla «Leo: permitir lectura pública y calificación de ventas» antepone `[TOOLS:read-only]` y un salto de línea al encargo. También se admite ese prefijo en `create_task.prompt`. La memoria continúa aislada salvo elección independiente. Las funciones, recibos persistentes y reanudación son las mismas que en objetivos. Sin el prefijo no se habilitan herramientas. El trabajador GitHub retoma `tools_saved` dentro de sus límites; no reintenta inmediatamente errores 503 ni cuotas. Esto no concede navegador interactivo, cuentas privadas, correo ni escrituras.
 
-Validación local: 109 pruebas de servidor y 8 del trabajador; Gemini simulado. Prueba live aprobada en Site v39: encargo `leo-direct-live-tools-20261026-v39`, recibo `leo-direct-live-tools-20261026-v39-tool-0`, GitHub run `40405441125`, fuente `github-actions`, memoria `isolated`. Evidencia completa en `evidence/leo-direct-tools-live-2026-10-26.json`. El disparo fue manual y no acredita puntualidad del cron ni navegador interactivo. Cuota diaria alcanzada: 20/20.
+Validación local: 109 pruebas de servidor y 8 del trabajador; Gemini simulado. Prueba live posterior a publicación pendiente.
+
+## Leo: CRM de Supabase conectado al Site — 27 octubre 2026
+
+Adaptador original en `worker/leo-crm.mjs` y endpoint `/api/agents/leo/crm`. La interfaz `/leo-crm.html` registra solicitudes como pedidos en borrador, consulta pedidos por número y lista oportunidades. No cambia el chat general ni habilita correo, pagos o una venta autónoma.
+
+El servidor usa la identidad confiable de Sites. Una función Edge autenticada mediante credencial interna comprueba membresía explícita por empresa; las credenciales nunca llegan al navegador. La vinculación del propietario usa su correo verificado y fija su ID de usuario de Sites al primer acceso. Los visitantes no reciben membresía automática. El puente no agrega otro inicio de sesión ni concede permisos públicos al CRM.
+
+Alta atómica de contacto, oportunidad, pedido y actividad; reintentos conservan el UUID y número de pedido. Se rechazan reintentos con datos distintos y accesos de otra empresa. Pruebas: 109 comprobaciones anteriores, seis grupos de pruebas locales del adaptador y once comprobaciones HTTP reales con dos empresas sintéticas; datos de prueba eliminados. Véanse `evidence/leo-crm-*-2026-10-27.json`. La aprobación de estas capacidades no certifica autonomía comercial completa.

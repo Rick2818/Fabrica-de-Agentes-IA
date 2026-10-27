@@ -34,3 +34,4 @@
 .pet-grid > .pet-shell:nth-child(5) .pet-card svg linearGradient stop:first-child{stop-color:#ffe6b9}
 .pet-grid > .pet-shell:nth-child(6) .pet-card svg linearGradient stop:first-child{stop-color:#ffe0f0}
 .pet-card svg .pet-body>path:nth-child(2){filter:drop-shadow(0 0 3px rgba(var(--agent-rgb),.45))}
+

@@ -1,0 +1,13 @@
+# CRM de Leo en el Site original
+
+Flujo: navegador autenticado con Sites → `/api/agents/leo/crm` → función Supabase `leo-crm` → RPC transaccional `crm_leo_site_action`.
+
+El proyecto Supabase es `udispwzwrebjkanudcoy`. La interfaz usa solo solicitudes al mismo origen. `LEO_CRM_BRIDGE_KEY` es secreto del runtime de Sites; su digest SHA-256 en la función Edge permite autenticar el puente sin incluir la credencial en código. Las variables automáticas `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` permanecen dentro de la función Edge. El control de organización ocurre en la RPC antes de toda lectura o escritura. La RPC es SECURITY INVOKER y únicamente service_role puede ejecutarla. El rol service_role omite RLS, por lo que el filtro explícito de empresa y la membresía son controles obligatorios del puente; las políticas RLS originales siguen protegiendo acceso directo de usuarios Supabase.
+
+Las membresías de Sites se preaprovisionan por un administrador en `private.crm_site_memberships`; la identidad de Sites no equivale a `auth.users`. No crear usuarios Supabase ni alterar su autenticación para este puente. El correo de la membresía debe coincidir con el suministrado por Sites. El primer acceso vincula el ID inmutable de Sites; otro ID no puede reclamar ese correo. Los visitantes sin membresía se rechazan.
+
+`status`, `list`, `get_order` y `create_order` son las únicas acciones. La empresa no se acepta desde el navegador. Crear una solicitud produce solo un pedido `draft`, sin confirmar venta, cobrar ni contactar a nadie. La RPC registra cuatro tablas dentro de una transacción. UUID de solicitud repetido con el mismo contenido recupera el pedido; contenido distinto produce 409. El bloqueo transaccional serializa reintentos concurrentes. El formulario conserva el UUID mientras se reintenta en la misma página; tras una recarga o cierre, consultar pedidos antes de registrar otra vez una solicitud cuyo resultado fue incierto.
+
+Pruebas locales: `node scripts/test-leo-crm.mjs`; regresión: `node scripts/test-agent.mjs`; empaquetado: `node scripts/build.mjs` y `node --check dist/server/index.js`. Las pruebas HTTP en `scripts/test-leo-crm-live.mjs` requieren aprovisionar empresas y membresías sintéticas previamente y recibir el secreto por stdin oculto, nunca argumentos o archivos. Eliminar las pruebas después de verificar. No ejecutar contra identidades de clientes.
+
+Procedencia: implementación independiente, sin SDK ni dependencias añadidas. Documentación oficial consultada: Sites Identity and Secrets; https://supabase.com/docs/guides/api/securing-your-api y https://supabase.com/changelog/cbc-tls-ciphers-deprecated. El cambio TLS anunciado no afecta a fetch moderno de Workers/Edge.

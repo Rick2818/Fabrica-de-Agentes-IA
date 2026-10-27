@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "checks": [
+    "identity, CSRF, configuration and tenant injection rejected before network",
+    "trusted Site identity forwarded; client request UUID preserved",
+    "original Site runtime routes to adapter",
+    "uncertain upstream response never claims success or leaks details",
+    "Edge Function authenticates its own credential and rejects another Site",
+    "database authorization failures preserved"
+  ]
+}

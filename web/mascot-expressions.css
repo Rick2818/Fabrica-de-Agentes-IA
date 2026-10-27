@@ -8,3 +8,4 @@
 @keyframes pet-dance{from{transform:rotate(-11deg) translateY(-6px)}to{transform:rotate(11deg) translateY(-1px)}}
 @keyframes pet-speaking{from{transform:scaleY(.98)}to{transform:scaleY(1.025)}}
 @media(prefers-reduced-motion:reduce){.pet-card.pet-dancing .pet-body,.pet-card.pet-speaking .pet-body{animation:none!important}}
+
