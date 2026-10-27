@@ -33,8 +33,28 @@
     "job_id": 122507818408,
     "commit_sha": "d4e593cd4fb1993bc70494d2e703f5cff1810c04",
     "url": "https://github.com/Rick2818/Fabrica-de-Agentes-IA/actions/runs/40571060672/attempts/2",
-    "status_at_capture": "in_progress",
-    "client_note": "Replay uses original run's client source; deployed Site runtime v48 and stricter client local tests/CI verified separately"
+    "status_at_capture": "completed",
+    "client_note": "Replay uses original run's client source; deployed Site runtime v48 and stricter client local tests/CI verified separately",
+    "conclusion": "success",
+    "final_receipt": {
+      "started_at": 1793139995904,
+      "completed_at": 1793139999595,
+      "source": "github-actions",
+      "status": "waiting",
+      "job_id": "g-goal-leo-governance-audit-20261027-v1-step-1-r0",
+      "pending": 1,
+      "next_at": 1793140059298,
+      "github": {
+        "provider": "github-actions",
+        "repository_id": "1432658222",
+        "repository": "Rick2818/Fabrica-de-Agentes-IA",
+        "run_id": "40571060672",
+        "run_attempt": "2",
+        "event": "schedule",
+        "commit_sha": "d4e593cd4fb1993bc70494d2e703f5cff1810c04"
+      }
+    },
+    "note": "The existing runner stopped normally at a deferred existing Governance job; success does not mean all queued objectives completed."
   },
   "crm_preservation": {
     "adapter_UI_SQL_manifest_diff": "none relative to v47",
