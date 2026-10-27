@@ -1,0 +1,24 @@
+diff --git a/docs/voice-integration.md b/docs/voice-integration.md
+index 5e73d33..788c827 100644
+--- a/docs/voice-integration.md
++++ b/docs/voice-integration.md
+@@ -6,3 +6,6 @@ Dependencies: @mintplex-labs/piper-tts-web 1.0.5 (MIT), locally vendored; change
+ Spanish: es_MX-ald-medium; model card specifies Unlicense dataset. English: en_US-ljspeech-medium; model card specifies public-domain dataset, trained from scratch. Model cards: https://huggingface.co/rhasspy/piper-voices/blob/main/es/es_MX/ald/medium/MODEL_CARD and https://huggingface.co/rhasspy/piper-voices/blob/main/en/en_US/ljspeech/medium/MODEL_CARD .
+ 
+ This does not embed or redistribute the Maney demonstration voice (license unverified). The previous approved Maney sample is a separate external demonstration. No singing synthesis added. First use downloads about 65 MB per voice, plus runtime. Requires an open compatible browser; does not enable background audio with laptop closed.
++
++## Correction: approved Spanish voice
++Rick approved the Maney external sample, not ald. Disabled ald after the mismatch was reported. Maney official repository has no current explicit grant and proposed terms exclude commercial services: https://huggingface.co/HirCoir/tts.hircoir.eu.org.models/blob/main/README.md . Do not distribute or integrate Maney for this commercial platform without rights-holder permission. English remains connected.
+diff --git a/web/factory-voice.js b/web/factory-voice.js
+index 0aac40d..855234c 100644
+--- a/web/factory-voice.js
++++ b/web/factory-voice.js
+@@ -5,6 +5,8 @@ export function stopVoice(){serial++;if(audio){audio.pause();audio.src='';audio=
+ export function setVoiceVolume(value){volume=Math.max(0,Math.min(1,Number(value)));if(audio)audio.volume=volume}
+ export async function speakVoice(text,{lang=language(),onState=()=>{}}={}){
+  stopVoice();const id=serial;
++ if(lang==='es'){onState('failed','La voz española aprobada (Maney) está pendiente de autorización para integrarla.');return;}
++
+  // Unlock playback during the click, before model downloads finish.
+  const player=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQAAAAA=');
+  audio=player;void player.play().catch(()=>{});
