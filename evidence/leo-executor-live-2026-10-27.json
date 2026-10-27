@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-27",
+  "site": "appgprj_6adbf0c05a0c8191b2ca585b76f5e862",
+  "version": 48,
+  "source_commit": "a76bd28e6a71011c12246ed1e58a7c350ce727c2",
+  "github_code_commit": "73f1e9cbd97842e3c026fead9a20eb74c6c84e0e",
+  "deployment": "appgdep_6ae124f6e3c48191ae990aa2d35f341d",
+  "deployment_status": "succeeded",
+  "ci": {
+    "run_id": 40594752752,
+    "conclusion": "success"
+  },
+  "live_marker": {
+    "id": "leo-executor-marker-20261027",
+    "status": "done",
+    "result": "LEO_EXECUTOR_OK_20261027",
+    "attempts": 1,
+    "evidence": {
+      "provider": "Google",
+      "model": "gemini-3.6-flash",
+      "http": 200,
+      "completed_at": 1793139972285,
+      "sha256": "a8a7c2234420a984e36b9ce4f0eadb07e7e8425f0a65cd44e8aa11cf71d8cd86",
+      "characters": 24,
+      "execution_source": "github-actions",
+      "context_mode": "isolated"
+    }
+  },
+  "runner": {
+    "run_id": "40571060672",
+    "run_attempt": "2",
+    "trigger_description": "Operator-requested re-run of the existing scheduled GitHub job; NOT a new natural cron event",
+    "job_id": 122507818408,
+    "commit_sha": "d4e593cd4fb1993bc70494d2e703f5cff1810c04",
+    "url": "https://github.com/Rick2818/Fabrica-de-Agentes-IA/actions/runs/40571060672/attempts/2",
+    "status_at_capture": "in_progress",
+    "client_note": "Replay uses original run's client source; deployed Site runtime v48 and stricter client local tests/CI verified separately"
+  },
+  "crm_preservation": {
+    "adapter_UI_SQL_manifest_diff": "none relative to v47",
+    "contacts": 0,
+    "orders": 0
+  },
+  "limits": [
+    "No additional scheduler created",
+    "Only isolated synthetic text task; no email, calendar, client writes or payments",
+    "Continuous cadence remains unverified due observed multi-hour primary gaps",
+    "Point 3 remains incomplete"
+  ]
+}
