@@ -77,13 +77,18 @@ export async function continuity(db,now=Date.now()){
  const watcher=await first(db,"SELECT value FROM settings WHERE key='watchdog_check'");
  let check=null,watchdog=null;try{check=JSON.parse(raw?.value||'null');watchdog=JSON.parse(watcher?.value||'null')}catch{}
  const active=await first(db,"SELECT count(*) AS n,MIN(CASE WHEN status='running' THEN lease_until ELSE next_attempt_at END) AS due FROM jobs WHERE status IN ('queued','waiting','running')");
- const configuration=await first(db,"SELECT value FROM settings WHERE key='automation'");let enabled=false;try{enabled=JSON.parse(configuration?.value||'null')?.enabled===true}catch{}
+ const configuration=await first(db,"SELECT value FROM settings WHERE key='automation'");let enabled=false,configured=null;try{configured=JSON.parse(configuration?.value||'null');enabled=configured?.enabled===true}catch{}
+ const primary=typeof configured?.id==='string'?await first(db,"SELECT * FROM agent_cycles WHERE schedule_id=? AND source IN ('scheduled','github-actions') AND completed_at IS NOT NULL ORDER BY completed_at DESC,id DESC LIMIT 1",configured.id):latest;
+ const backup=typeof configured?.id==='string'?cycles.find(c=>['scheduled','github-actions'].includes(c.source)&&c.schedule_id!==configured.id&&c.completed_at):null;
+ const primaryStale=!primary||now-primary.completed_at>(primary.source==='github-actions'?45:90)*60000;
  const stale=!latest||now-latest.completed_at>(latest.source==='github-actions'?45:90)*60000;
  const observedDisabled=check&&now-check.checked_at<90*60000&&!check.is_enabled;
  const attention=(check&&now-check.checked_at<90*60000&&(check.requires_user_action||check.status==='failed'))||(watchdog&&now-watchdog.checked_at<90*60000&&(!watchdog.is_enabled||watchdog.requires_user_action||watchdog.status==='failed'));
- const status=!enabled&&configuration?'paused':observedDisabled?'stopped':attention?'attention':latest&&!stale?'recent':enabled?'unverified':'unconfigured';
- const stalled=active.n>0&&active.due!=null&&now-active.due>90*60000&&stale;
- return {status,last_scheduled_cycle:latest||null,cycles,scheduler_check:check,watchdog_check:watchdog,stalled,pending:active.n,oldest_due:active.due||null};
+ const runnerError=primary&&['failed','error'].includes(primary.status)&&!primaryStale;
+ const status=!enabled&&configuration?'paused':observedDisabled?'stopped':attention||runnerError?'attention':enabled&&configured?.id&&primaryStale?(latest&&!stale?'degraded':'unverified'):latest&&!stale?'recent':enabled?'unverified':'unconfigured';
+ // Heartbeats from either scheduler cannot hide a long-overdue queue item.
+ const stalled=active.n>0&&active.due!=null&&now-active.due>90*60000;
+ return {status,last_scheduled_cycle:latest||null,primary:{schedule_id:configured?.id||null,last_cycle:primary||null,recent:!primaryStale},backup:{last_cycle:backup||null,recent:!!backup&&now-backup.completed_at<=90*60000},cycles,scheduler_check:check,watchdog_check:watchdog,stalled,pending:active.n,oldest_due:active.due||null};
 }
 export async function recordSchedulerCheck(db,a,now=Date.now()){
  if(!text(a.schedule_id,200)||typeof a.is_enabled!=='boolean'||typeof a.requires_user_action!=='boolean'||!['completed','in_progress','failed','no_update','unknown'].includes(a.status)||!(a.run_id==null||text(a.run_id,200)))throw Object.assign(Error('Comprobación inválida.'),{status:400});
@@ -428,7 +433,8 @@ async function cloudRunner(request,env){
   context=Object.fromEntries(['provider','repository_id','repository','run_id','run_attempt','event','commit_sha'].map(key=>[key,context[key]]));
  }
  const started_at=Date.now();
- const run=context?await runRecordedCycle(env.DB,{...env,RUN_SOURCE:'github-actions'},{trigger:'scheduled',cycle_id:context.run_id+'-'+context.run_attempt,schedule_id:'github:'+context.repository_id}):await runNext(env.DB,{...env,RUN_SOURCE:'service-runner'});
+ const pauseSetting=await first(env.DB,"SELECT value FROM settings WHERE key='automation'");let servicePaused=false;try{servicePaused=JSON.parse(pauseSetting?.value||'null')?.enabled===false}catch{}
+ const run=context?await runRecordedCycle(env.DB,{...env,RUN_SOURCE:'github-actions'},{trigger:'scheduled',cycle_id:context.run_id+'-'+context.run_attempt,schedule_id:'github:'+context.repository_id}):servicePaused?{status:'paused'}:await runNext(env.DB,{...env,RUN_SOURCE:'service-runner'});
  const pending=await first(env.DB,"SELECT count(*) AS n,MIN(CASE WHEN status='running' THEN lease_until ELSE next_attempt_at END) AS next_at FROM jobs WHERE status IN ('queued','waiting','running')");
  await syncNotifications(env.DB);
  const receipt={started_at,completed_at:Date.now(),source:context?'github-actions':'service-runner',status:run.status,job_id:run.id||null,pending:pending.n,next_at:Math.max(run.next_at||0,pending.next_at||0)||null,...(context?{github:context}:{})};

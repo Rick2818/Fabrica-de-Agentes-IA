@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-27",
+  "project": "Fábrica de Agentes IA",
+  "scope": "Point 4 only; CRM v47 preserved",
+  "before": {
+    "primary_last_receipt": {
+      "started_at": 1793129967638,
+      "completed_at": 1793129968510,
+      "source": "github-actions",
+      "status": "idle",
+      "job_id": null,
+      "pending": 0,
+      "next_at": null,
+      "github": {
+        "provider": "github-actions",
+        "repository_id": "1432658222",
+        "repository": "Rick2818/Fabrica-de-Agentes-IA",
+        "run_id": "40571060672",
+        "run_attempt": "1",
+        "event": "schedule",
+        "commit_sha": "d4e593cd4fb1993bc70494d2e703f5cff1810c04"
+      }
+    },
+    "latest_backup": {
+      "id": "3455c4ef-0c30-4bcb-9a04-1ba622f827ce",
+      "cycle_id": "c0ce2a9f-cd04-8332-8535-faf89f35845c",
+      "schedule_id": "6adbf94d28e8819189c0516c6068457a",
+      "source": "scheduled",
+      "status": "idle",
+      "job_id": null,
+      "started_at": 1793136036767,
+      "completed_at": 1793136037349
+    },
+    "pending": [
+      {
+        "id": "g-goal-leo-governance-audit-20261027-v1-plan-0-r0",
+        "status": "waiting",
+        "error": "Gemini tardó demasiado. Se reintentará sin duplicar el resultado."
+      }
+    ],
+    "configured_schedule": {
+      "id": "github:1432658222",
+      "schedule": "Cada 15 minutos · minutos 07, 22, 37 y 52 · America/El_Salvador",
+      "enabled": true,
+      "verified_at": 1792886197790
+    }
+  },
+  "verified_primary_github": {
+    "run_id": 40571060672,
+    "job_id": 122425058168,
+    "event": "schedule",
+    "conclusion": "success",
+    "url": "https://github.com/Rick2818/Fabrica-de-Agentes-IA/actions/runs/40571060672",
+    "log_status": "idle",
+    "pending": 0
+  },
+  "changes": [
+    "Primary and backup freshness reported separately; fresh backup no longer masks stale primary",
+    "Long-overdue jobs remain visible despite fresh heartbeats",
+    "Service runner without GitHub context respects global scheduler pause",
+    "Worker validates complete GitHub context, receipt status, job correlation, timestamps, next_at and recognized states"
+  ],
+  "verification": {
+    "agent_tests": 112,
+    "cloud_runner_tests": 10,
+    "crm_adapter_tests": "passed",
+    "artifact": "valid ESM; original six agents retained"
+  },
+  "not_certified": [
+    "Uninterrupted 24/7 scheduling cadence: observed multi-hour gaps",
+    "CRM/email/calendar and autonomous external actions"
+  ]
+}

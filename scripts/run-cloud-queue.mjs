@@ -12,7 +12,8 @@ export async function runCloudQueue(config,{fetcher=fetch,sleep=ms=>new Promise(
   if(!response.ok)throw Error('El ejecutor devolvió HTTP '+response.status+'. No se acredita ejecución.');
   let data;try{data=await response.json()}catch{throw Error('El ejecutor devolvió un formato inválido.');}
   const {run,receipt}=data;
-  if(!run||!receipt||typeof run.status!=='string'||receipt.source!=='github-actions'||receipt.github?.run_id!==context.run_id||receipt.github?.run_attempt!==context.run_attempt||!Number.isSafeInteger(receipt.pending)||receipt.pending<0||!Number.isSafeInteger(receipt.completed_at))throw Error('Falta un recibo válido de esta ejecución de GitHub.');
+  const statuses=['done','cancelled','busy','quota','waiting','needs_input','idle','paused','failed','error','unconfigured'];
+  if(!run||!receipt||!statuses.includes(run.status)||receipt.status!==run.status||receipt.source!=='github-actions'||Object.keys(context).some(k=>receipt.github?.[k]!==context[k])||!Number.isSafeInteger(receipt.pending)||receipt.pending<0||!Number.isSafeInteger(receipt.started_at)||!Number.isSafeInteger(receipt.completed_at)||receipt.started_at<0||receipt.completed_at<receipt.started_at||receipt.completed_at>now()+300000||receipt.next_at!=null&&(!Number.isSafeInteger(receipt.next_at)||receipt.next_at<0)||['done','cancelled'].includes(run.status)&&(!run.id||receipt.job_id!==run.id))throw Error('Falta un recibo válido de esta ejecución de GitHub.');
   last={status:run.status,pending:receipt.pending,completed_at:receipt.completed_at};log(last);
   if(run.status==='done')phases++;
   if(['failed','error','unconfigured'].includes(run.status))throw Error('Ejecución detenida: '+run.status);

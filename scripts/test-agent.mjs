@@ -205,5 +205,31 @@ await test('Encargo sin permiso no puede activar herramientas al mencionarlas ni
  let calls=0;globalThis.fetch=async(url,options)=>{calls++;assert(String(url).includes('googleapis'));assert(!JSON.parse(options.body).tools);return Response.json({candidates:[{content:{parts:[{functionCall:{name:'read_public_page',args:{url:'https://example.com'}}}]}}]})};
  assert.equal((await runNext(local,env,now)).status,'error');assert.equal(calls,1);assert.notEqual((await board(local)).jobs[0].status,'done');
 });
+await test('Pausa global también bloquea la entrada de servicio sin contexto GitHub',async()=>{
+ const local=new D1();local.db.exec(migration);await enqueue(local,{id:'pause-service-test',kind:'task',title:'Prueba',text:'Solo texto'},now);
+ await local.prepare("INSERT INTO settings VALUES('automation',?)").bind(JSON.stringify({enabled:false,id:'github:1432658222'})).run();
+ let calls=0;globalThis.fetch=async()=>{calls++;return answer()};
+ const e={...env,DB:local,AGENT_RUNNER_SECRET:'test-runner-secret-at-least-32-characters'};
+ const response=await worker.fetch(new Request('https://example.test/internal/runner',{method:'POST',headers:{'x-agent-runner-key':e.AGENT_RUNNER_SECRET}}),e);
+ const body=await response.json();assert.equal(body.run.status,'paused');assert.equal(body.receipt.status,'paused');assert.equal(calls,0);assert.equal((await board(local)).jobs[0].status,'queued');
+});
+await test('El respaldo reciente no oculta la ausencia del principal ni pendientes vencidos',async()=>{
+ const local=new D1();local.db.exec(migration);
+ await local.prepare("INSERT INTO settings VALUES('automation',?)").bind(JSON.stringify({enabled:true,id:'github:1432658222'})).run();
+ await enqueue(local,{id:'overdue-backup-test',kind:'task',title:'Prueba',text:'Texto'},now-3*3600000);
+ await local.prepare("INSERT INTO agent_cycles VALUES(?,?,?,?,?,?,?,?)").bind('old-primary','1-1','github:1432658222','github-actions','idle',null,now-3*3600000,now-3*3600000+1).run();
+ await local.prepare("INSERT INTO agent_cycles VALUES(?,?,?,?,?,?,?,?)").bind('fresh-backup','backup-1','backup-schedule','scheduled','idle',null,now-1000,now-1).run();
+ const h=await continuity(local,now);assert.equal(h.status,'degraded');assert.equal(h.primary.recent,false);assert.equal(h.backup.recent,true);assert.equal(h.primary.last_cycle.id,'old-primary');assert.equal(h.stalled,true);
+});
+await test('Un recibo no persistido falla HTTP sin repetir un resultado ya guardado',async()=>{
+ const local=new D1();local.db.exec(migration);await enqueue(local,{id:'receipt-write-fail',kind:'task',title:'Prueba',text:'Solo texto'},now);
+ let calls=0;globalThis.fetch=async()=>{calls++;return answer('Resultado único')};
+ const originalPrepare=local.prepare.bind(local);let fail=true;
+ local.prepare=sql=>{if(fail&&sql.includes("'cloud_runner_receipt'")){fail=false;throw Error('Simulated storage failure')}return originalPrepare(sql)};
+ const e={...env,DB:local,AGENT_RUNNER_SECRET:'test-runner-secret-at-least-32-characters'};
+ const call=()=>worker.fetch(new Request('https://example.test/internal/runner',{method:'POST',headers:{'x-agent-runner-key':e.AGENT_RUNNER_SECRET}}),e);
+ assert.equal((await call()).status,500);assert.equal((await board(local)).jobs[0].status,'done');
+ local.db.prepare('UPDATE runner_lock SET expires=0').run();assert.equal((await (await call()).json()).run.status,'idle');assert.equal(calls,1);assert.equal((await board(local)).jobs[0].result,'Resultado único');
+});
 globalThis.fetch=originalFetch;
 console.log(JSON.stringify({passed:checks.length,scope:'Local SQL real; Gemini simulado para fallos, cancelación y recuperación.',checks}));
