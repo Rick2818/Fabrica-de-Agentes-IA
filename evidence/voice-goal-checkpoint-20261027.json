@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-27",
+  "site": "appgprj_6adbf0c05a0c8191b2ca585b76f5e862",
+  "version": 45,
+  "source": "c8af44af843be67288f1ad93a85df9169282bb16",
+  "status": "blocked_model_selection_not_completed",
+  "requirements": {
+    "male": [
+      "Leo",
+      "Nico"
+    ],
+    "female": [
+      "Mila",
+      "Vera",
+      "Alma",
+      "Lía"
+    ],
+    "locales": [
+      "es-MX",
+      "en-US"
+    ]
+  },
+  "findings": [
+    "Current source refreshed via Sites, not replaced by GitHub snapshot.",
+    "All ES currently use ald; all EN use ljspeech; callers pass no agent identity. Gender routing remains missing.",
+    "Maney was the approved external sample; ald was rejected replacement. Do not claim approval for ald.",
+    "Piper claude has es-MX Apache-2.0 model card, but model author collection states no explicit current license and proposed terms exclude commercial services. Needs rights clarification; gender not verified from original model author.",
+    "Kokoro official VOICES.md explicitly distinguishes US male and female voices; Spanish voices listed as Spanish, not Mexican. Do not label Kokoro Spanish as Mexican.",
+    "Common Voice Mexican female CC0 dataset is ASR multi-speaker corpus, not a ready licensed TTS voice or evidence of zero-cost browser synthesis."
+  ],
+  "sources": [
+    "https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md",
+    "https://huggingface.co/rhasspy/piper-voices/blob/main/es/es_MX/claude/high/MODEL_CARD",
+    "https://huggingface.co/HirCoir/tts.hircoir.eu.org.models/blob/main/README.md",
+    "https://huggingface.co/HirCoir/piper-checkpoint-es-mx-maney"
+  ],
+  "blocker": "No ready female es-MX model with primary-source gender, clear commercial model/dataset permission, and real playback evidence verified in this run. Do not silently substitute European Spanish or pitch-shift a male voice.",
+  "next": "Resolve explicit commercial permission from Mexican female voice rights holder, or obtain user authorization to change locale requirement; then implement agent registry, both call sites, cached sessions keyed by model and synthesis parameters, cancellation and normalized volume, and verify all twelve combinations.",
+  "changesPublishedThisRun": false,
+  "costsActivated": false
+}
