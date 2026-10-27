@@ -1,0 +1,32 @@
+diff --git a/docs/voice-integration.md b/docs/voice-integration.md
+index 788c827..cb07b8d 100644
+--- a/docs/voice-integration.md
++++ b/docs/voice-integration.md
+@@ -9,3 +9,6 @@ This does not embed or redistribute the Maney demonstration voice (license unver
+ 
+ ## Correction: approved Spanish voice
+ Rick approved the Maney external sample, not ald. Disabled ald after the mismatch was reported. Maney official repository has no current explicit grant and proposed terms exclude commercial services: https://huggingface.co/HirCoir/tts.hircoir.eu.org.models/blob/main/README.md . Do not distribute or integrate Maney for this commercial platform without rights-holder permission. English remains connected.
++
++## User-authorized replacement
++Rick requested a Mexican voice with permission. Re-enabled es_MX-ald-medium, explicitly labelled Español · México · Ald; not Maney. Model card declares dataset Unlicense; public model repository MIT metadata. https://huggingface.co/rhasspy/piper-voices/blob/main/es/es_MX/ald/medium/MODEL_CARD .
+diff --git a/web/factory-voice.js b/web/factory-voice.js
+index 855234c..d9a38c1 100644
+--- a/web/factory-voice.js
++++ b/web/factory-voice.js
+@@ -5,7 +5,6 @@ export function stopVoice(){serial++;if(audio){audio.pause();audio.src='';audio=
+ export function setVoiceVolume(value){volume=Math.max(0,Math.min(1,Number(value)));if(audio)audio.volume=volume}
+ export async function speakVoice(text,{lang=language(),onState=()=>{}}={}){
+  stopVoice();const id=serial;
+- if(lang==='es'){onState('failed','La voz española aprobada (Maney) está pendiente de autorización para integrarla.');return;}
+ 
+  // Unlock playback during the click, before model downloads finish.
+  const player=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQAAAAA=');
+@@ -20,7 +19,7 @@ export async function speakVoice(text,{lang=language(),onState=()=>{}}={}){
+  chain=chain.catch(()=>{}).then(task);return chain;
+ }
+ window.factoryVoice={speak:speakVoice,stop:stopVoice,setVolume:setVoiceVolume};
+-const bar=document.createElement('div');bar.className='voice-controls';bar.innerHTML='<label>Voz / Voice <select id="factory-voice-language"><option value="es">Español</option><option value="en">English</option></select></label> <label>Volumen / Volume <input id="factory-voice-volume" type="range" min="0" max="100" value="100"></label><p>La primera vez se descarga la voz (aprox. 65 MB). / First use downloads the voice (about 65 MB).</p>';
++const bar=document.createElement('div');bar.className='voice-controls';bar.innerHTML='<label>Voz / Voice <select id="factory-voice-language"><option value="es">Español · México · Ald</option><option value="en">English</option></select></label> <label>Volumen / Volume <input id="factory-voice-volume" type="range" min="0" max="100" value="100"></label><p>La primera vez se descarga la voz (aprox. 65 MB). / First use downloads the voice (about 65 MB).</p>';
+ (document.querySelector('.pet-gallery')||document.querySelector('main')).append(bar);
+ const languageBox=bar.querySelector('select');languageBox.value=language();
+ window.factoryVoice.language=()=>languageBox.value;
