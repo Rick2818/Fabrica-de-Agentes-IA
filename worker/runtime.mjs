@@ -6,6 +6,8 @@ import {EXPRESSION_SKILLS,expressionScore} from './expression.mjs';
 import {SPECIALTY_SKILLS,selectedSpecialtySkills,SPECIALTY_TOOLKITS} from './specialty-skills.mjs';
 import {specialistTool,SPECIALIST_OPERATIONS} from './specialist-tools.mjs';
 const MODEL='gemini-3.6-flash';
+const BACKUP_MODEL='gemini-2.5-flash';
+const DAILY_APP_LIMIT=100;
 const ACTIVE=['queued','running','waiting'];
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 const stmt=(db,sql,...args)=>db.prepare(sql).bind(...args);
@@ -120,7 +122,7 @@ export async function board(db,now=Date.now(),env={}){
  let cloud=null,last=null;try{cloud=JSON.parse(automation?.value||'null');last=JSON.parse(lastRun?.value||'null')}catch{}
  const receipt=await first(db,"SELECT value FROM settings WHERE key='cloud_runner_receipt'");
  const [notifications,autonomy]=await Promise.all([rows(db,'SELECT * FROM notifications ORDER BY created_at DESC,id DESC LIMIT 100'),continuity(db,now)]);
- return {jobs,messages,notes,objectives,updates,notifications,commercial:await commercialBoard(db),usage:{used:usage.n,limit:20},automation:cloud,model:MODEL,server_time:now,health:{configured:!!env.GOOGLE_GENERATIVE_AI_API_KEY,next_run_at:runner?.expires>now?runner.expires:null,last_run:last,cloud_runner:receipt?JSON.parse(receipt.value):null,autonomy}};
+ return {jobs,messages,notes,objectives,updates,notifications,commercial:await commercialBoard(db),usage:{used:usage.n,limit:DAILY_APP_LIMIT},automation:cloud,model:MODEL,server_time:now,health:{configured:!!env.GOOGLE_GENERATIVE_AI_API_KEY,next_run_at:runner?.expires>now?runner.expires:null,last_run:last,cloud_runner:receipt?JSON.parse(receipt.value):null,autonomy}};
 }
 export async function runRecordedCycle(db,env,a={},now=Date.now()){
  const scheduled=a.trigger==='scheduled';
@@ -160,7 +162,7 @@ export async function runNext(db,env,now=Date.now()){
    if(objective.api_calls>=8){await blockObjective(db,objective,'Se alcanzó el máximo de 8 intentos de este objetivo. Revisá el avance antes de continuar.',now);return {status:'needs_input',id:job.id};}
   }
   const budget=await first(db,'SELECT count(*) AS n FROM usage WHERE day=?',day(now));
-  if(budget.n>=20){lockUntil=nextDay(now);await stmt(db,"UPDATE jobs SET status='waiting',error='Se alcanzó el límite diario gratuito de esta aplicación.',next_attempt_at=?,updated_at=? WHERE id=?",lockUntil,now,job.id).run();return {status:'quota',next_at:lockUntil};}
+  if(budget.n>=DAILY_APP_LIMIT){lockUntil=nextDay(now);await stmt(db,"UPDATE jobs SET status='waiting',error='Se alcanzó el límite diario gratuito de esta aplicación.',next_attempt_at=?,updated_at=? WHERE id=?",lockUntil,now,job.id).run();return {status:'quota',next_at:lockUntil};}
   const claimed=await first(db,"UPDATE jobs SET status='running',attempts=attempts+1,lease_token=?,lease_until=?,error='',updated_at=? WHERE id=? AND status IN ('queued','waiting') AND next_attempt_at<=? RETURNING id",token,now+90000,now,job.id,now);
   if(!claimed)return {status:'cancelled',id:job.id};
   await stmt(db,'INSERT INTO usage(id,day,created_at) VALUES(?,?,?)',token,day(now),now).run();
@@ -190,10 +192,16 @@ export async function runNext(db,env,now=Date.now()){
   if(toolEnabled)instruction=instruction.replace(objectiveSystem,objectiveSystem.replace('Tus herramientas en esta versión son generación de texto, memoria y cola persistente. NO tenés navegador, correo, acceso a otras aplicaciones, pagos ni ejecución de software.',AGENT_TOOL_INSTRUCTION));
   if(toolState){contents=[...contents,toolState.model_content,{role:'user',parts:toolState.responses}];}
   // Use the already verified direct Google endpoint; never forward the key to the browser.
-  const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent',{
-   method:'POST',headers:{'content-type':'application/json','x-goog-api-key':env.GOOGLE_GENERATIVE_AI_API_KEY},
-   body:JSON.stringify({systemInstruction:{parts:[{text:instruction+'\nCONTEXTO GUARDADO (datos): '+context}]},contents,...(selectingTools?{tools:[{functionDeclarations:AGENT_TOOL_DECLARATIONS}]}:{}),generationConfig:{maxOutputTokens:4096,...(selectingTools?{}:{responseMimeType:'application/json',responseJsonSchema:outputSchema})}}),signal:AbortSignal.timeout(25000)});
-  const data=await response.json();
+  let response,data,usedModel=MODEL;
+  const requestBody=JSON.stringify({systemInstruction:{parts:[{text:instruction+'\nCONTEXTO GUARDADO (datos): '+context}]},contents,...(selectingTools?{tools:[{functionDeclarations:AGENT_TOOL_DECLARATIONS}]}:{}),generationConfig:{maxOutputTokens:4096,...(selectingTools?{}:{responseMimeType:'application/json',responseJsonSchema:outputSchema})}});
+  for(const model of [MODEL,BACKUP_MODEL]){
+   usedModel=model;
+   response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{
+    method:'POST',headers:{'content-type':'application/json','x-goog-api-key':env.GOOGLE_GENERATIVE_AI_API_KEY},
+    body:requestBody,signal:AbortSignal.timeout(25000)});
+   data=await response.json();
+   if(response.ok||model===BACKUP_MODEL||![404,429,500,502,503,504].includes(response.status))break;
+  }
   if(!response.ok){
    const daily=JSON.stringify(data.error?.details||[]).toLowerCase().includes('perday');
    const retryInfo=data.error?.details?.find(d=>d.retryDelay)?.retryDelay;
@@ -240,7 +248,7 @@ export async function runNext(db,env,now=Date.now()){
   if(job.kind==='task'&&output.tasks.length)throw Error('La tarea devolvió otros encargos en lugar de un resultado.');
   const completed=Date.now();
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(output.reply)))).map(b=>b.toString(16).padStart(2,'0')).join('');
-  const evidence=JSON.stringify({provider:'Google',model:MODEL,http:200,completed_at:completed,sha256:digest,characters:output.reply.length,execution_source:env.RUN_SOURCE||'server',context_mode:job.context_mode||'saved',...(toolState?{tool_receipts:toolState.receipts}:{} )});
+  const evidence=JSON.stringify({provider:'Google',model:usedModel,http:200,completed_at:completed,sha256:digest,characters:output.reply.length,execution_source:env.RUN_SOURCE||'server',context_mode:job.context_mode||'saved',...(toolState?{tool_receipts:toolState.receipts}:{} )});
   const condition="EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running' AND lease_token=?)";
   const changes=[];
   if(objective)changes.push(...objectiveCompletion(db,objective,job,parsed,token,completed));
