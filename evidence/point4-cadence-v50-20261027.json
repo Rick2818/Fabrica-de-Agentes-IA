@@ -1,0 +1,130 @@
+{
+  "date": "2026-10-27",
+  "scope": "Punto 4: separar actividad manual de puntualidad automática",
+  "historical_primary_runs": [
+    {
+      "id": 40600684270,
+      "path": ".github/workflows/agent-runner.yml",
+      "created": "2026-10-27T23:13:58Z",
+      "started": "2026-10-28T02:13:24Z",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 2,
+      "actor": "Rick2818",
+      "workflow_id": 395515609
+    },
+    {
+      "id": 40571060672,
+      "path": ".github/workflows/agent-runner.yml",
+      "created": "2026-10-27T19:39:20Z",
+      "started": "2026-10-27T22:26:03Z",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 2,
+      "actor": "Rick2818",
+      "workflow_id": 395515609
+    },
+    {
+      "id": 40522679789,
+      "path": ".github/workflows/agent-runner.yml",
+      "created": "2026-10-27T14:36:10Z",
+      "started": "2026-10-27T14:36:10Z",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "actor": "Rick2818",
+      "workflow_id": 395515609
+    },
+    {
+      "id": 40471884582,
+      "path": ".github/workflows/agent-runner.yml",
+      "created": "2026-10-27T08:12:14Z",
+      "started": "2026-10-27T08:12:14Z",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "actor": "Rick2818",
+      "workflow_id": 395515609
+    },
+    {
+      "id": 40437585050,
+      "path": ".github/workflows/agent-runner.yml",
+      "created": "2026-10-27T02:17:37Z",
+      "started": "2026-10-27T02:17:37Z",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "actor": "Rick2818",
+      "workflow_id": 395515609
+    },
+    {
+      "id": 40418775802,
+      "path": ".github/workflows/agent-runner.yml",
+      "created": "2026-10-26T23:17:56Z",
+      "started": "2026-10-26T23:17:56Z",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "actor": "Rick2818",
+      "workflow_id": 395515609
+    }
+  ],
+  "new_findings": [
+    "Last 24h window ending at server_time1793154018876 contained four original primary schedule runs, despite configured five times per hour.",
+    "Three independent diagnostic schedules also show sparse creation dates; no skipped primary job or failed Site authentication evidenced in latest job.",
+    "Manual reruns inherit event=schedule but use run_attempt>1; previously they incorrectly refreshed automatic freshness."
+  ],
+  "implemented": [
+    "New manually dispatched or rerun GitHub cycles are labeled github-actions-manual.",
+    "Historical GitHub cycles with attempt suffix other than -1 cannot refresh automatic continuity.",
+    "UI labels manual/rerun separately; transport receipts remain compatible.",
+    "No schedule added, no new job, no permissions or provider changes."
+  ],
+  "tests": {
+    "agent": 115,
+    "runner": 10,
+    "crm_adapter": "passed",
+    "build": "passed",
+    "artifact": "passed",
+    "scope": "Local SQLite real; Gemini and HTTP simulated for new cases."
+  },
+  "limits": [
+    "Does not fix or prove GitHub scheduler frequency.",
+    "No real new task created; free model quota not consumed.",
+    "Historic event=workflow_dispatch attempt1 without retained context may remain indistinguishable; no fabricated history."
+  ],
+  "reference": "https://docs.github.com/en/actions/how-tos/troubleshoot-workflows",
+  "published_version": 50,
+  "source_commit": "b5532b6782952a772e356ebe0c31ab63a294d4ff",
+  "deployment_id": "appgdep_6ae15c54be848191a43fc3f7252c69a0",
+  "deployment_status": "succeeded",
+  "post_publish_real_check": {
+    "status": "degraded",
+    "primary": {
+      "schedule_id": "github:1432658222",
+      "last_cycle": {
+        "id": "0b6bc482-fd91-432e-b4fa-f09bae9d9b99",
+        "cycle_id": "40600684270-1",
+        "schedule_id": "github:1432658222",
+        "source": "github-actions",
+        "status": "waiting",
+        "job_id": "g-goal-leo-governance-audit-20261027-v1-step-1-r0",
+        "started_at": 1793142843506,
+        "completed_at": 1793142844861
+      },
+      "recent": false
+    },
+    "last_manual": {
+      "id": "ddb7fcd6-be10-43d6-b033-997555535bde",
+      "cycle_id": "40600684270-2",
+      "schedule_id": "github:1432658222",
+      "source": "github-actions",
+      "status": "idle",
+      "job_id": null,
+      "started_at": 1793153610899,
+      "completed_at": 1793153611487
+    },
+    "pending": 0
+  },
+  "patch_commit": "e7c4272e4bc739823fdf6934056909d27766923a"
+}
