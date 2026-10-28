@@ -1,0 +1,21 @@
+# Fábrica IA — Punto 4: control de continuidad (28 oct 2026, 16:09 SV)
+
+## Alcance y método
+Auditoría de **solo lectura** sobre Supabase `udispwzwrebjkanudcoy`, `agent_status` del complemento de Fábrica, `AGENTS.md`, los seis workflows en `main` de `Rick2818/Fabrica-de-Agentes-IA`, respuesta HTTP guardada en `net._http_response` y control previo de las 15:12 SV. Muestreo final de SQL: **2026-10-28 22:08:48.993Z (16:08:48 SV)**. No se invocó manualmente el tick, ni se cambió cuota, `not_before`, secretos, Site, cola, código de ejecución o disparadores.
+
+## Evidencia comprobada
+- `cron.job`: **un solo job activo**: `jobid=1`, `jobname=fabrica-queue`, `schedule=* * * * *`, `command=select private.fabrica_scheduler_tick();`.
+- `cron.job_run_details`: **171 ejecuciones**, todas `succeeded`, **0 errores SQL**. Última: `runid=171`, `2026-10-28 22:08:00.015479Z`. Son **57 ticks nuevos** desde el control de las 15:12 SV (114 entonces). Este estado **no** prueba procesamiento de un trabajo.
+- `private.fabrica_scheduler_receipts`: **1 recibo** en total, **0 `done` verificados**, **0 fallos de verificación**, **0 sin conciliar**. Ciclo único `97d77278-26db-4069-ad2c-059b2fe6402e`, `scheduled_at=2026-10-28 19:18:00.180Z`, `request_id=1`, `http_status=200`, `verified=true`, `site_status=quota`, `error_code=null`.
+- `net._http_response` para `id=1`: `status_code=200`, `timed_out=false`, `error_msg=null`; `run.status=quota`, `receipt.status=quota`, `receipt.job_id=null`; UUID, `scheduled_at`, `project_id` y `schedule_id` coinciden. **La respuesta fue auténtica, pero no hubo `done`.**
+- `private.fabrica_scheduler_config`: `enabled=true`, `last_error=null`, `not_before=2026-10-29 07:01:00Z` = **29 oct, 01:01 SV**. No venció al momento del control.
+- `agent_status`: cuota **20/20**, **6 trabajos `queued`**, **1 `waiting`** por cuota (objetivo E2E), 50 `done` históricos, 2 `failed` y 3 `cancelled`. Los `done` históricos provienen de otros ciclos y **no** acreditan `done` del programador principal. Autonomía: `waiting`. La última ejecución Supabase conserva `quota` y `job_id=null`.
+- Inspección de `pg_get_functiondef`: `private.fabrica_scheduler_tick` usa `pg_try_advisory_xact_lock(1432658222,51)`, `FOR UPDATE`, verificación de `enabled` y `not_before`, barrera de recibos pendientes, credenciales en Vault, UUID único y solicitud HTTP. `private.fabrica_scheduler_reconcile` compara identidad, UUID, tiempos, `status`, `job_id` para `done/cancelled`, maneja errores y difiere ante `next_at`. **Observado en código, no demostrado con prueba de carrera/recuperación real.**
+- `AGENTS.md` conserva la separación de proyectos, los seis nombres de las mascotas y la prohibición de declarar autonomía o paridad sin pruebas.
+- Los seis archivos de `.github/workflows/` leídos en `main`: `agent-runner.yml` y diagnósticos A/B/C solo `workflow_dispatch`; `training-regression.yml` y `verify-training.yml` tienen `push`/`workflow_dispatch`. **Ninguno contiene `schedule` en la fuente vigente**. La API de runs de GitHub todavía muestra ejecuciones históricas de evento `schedule` (última diagnostic C `40755614755`, creada 19:35:09Z), pero esa lista histórica no demuestra que los disparadores continúen configurados hoy.
+- Site original identificado por `appgprj_6adbf0c05a0c8191b2ca585b76f5e862` y su endpoint guardado en el programador. **No se obtuvo acceso al código fuente vigente del editor Sites ni prueba interactiva E2E**, por lo que no se certifica publicación o funcionalidad completa.
+
+## Decisión y próxima prueba
+**PUNTO 4 NO CERTIFICADO.** El aumento de ticks SQL sin nuevas solicitudes es coherente con el diferimiento por cuota; no justifica forzar ejecución ni modificar el sistema. El 29 oct, después de **01:01 SV**, exigir correlación de: (1) tick cron real, (2) nueva solicitud HTTP y recibo `verified=true` con `site_status=done`, (3) mismo UUID en el JSON del Site, `receipt.job_id` no nulo y coincidente, (4) trabajo realmente `done` y sin duplicaciones, (5) exclusión mutua, reintentos, pausa y recuperación probados de forma segura, (6) recorrido E2E del Site original. Si vuelve a ocurrir `quota` o `deferred`, conservar `not_before` y no fabricar una entrega.
+
+No se alteró infraestructura, no se generó costo y no se enviaron comunicaciones externas.
