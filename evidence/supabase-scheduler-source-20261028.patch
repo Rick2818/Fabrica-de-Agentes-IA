@@ -1,0 +1,187 @@
+diff --git a/agentes.md b/agentes.md
+index 3c83bdf..7153c3e 100644
+--- a/agentes.md
++++ b/agentes.md
+@@ -142,3 +142,19 @@ Alta atómica de contacto, oportunidad, pedido y actividad; reintentos conservan
+ El único trabajador sigue siendo la cola persistente y `/internal/runner` del Site, con GitHub como disparador principal existente y el respaldo ya configurado. No se añadió otro cron ni se ampliaron herramientas externas. Se separan recibos y frescura de principal/respaldo para impedir que el respaldo oculte retrasos del principal. Una tarea vencida por más de 90 minutos sigue visible aunque existan latidos recientes. La entrada de servicio respeta la pausa global también sin contexto GitHub. El cliente GitHub exige recibo correlacionado por todos los campos de ejecución, estado, trabajo y tiempos; estados desconocidos con cola vacía ya no se acreditan.
+ 
+ 112 pruebas SQL locales del agente, 10 pruebas del cliente GitHub y regresión del adaptador CRM aprobadas; prueba nueva de pérdida del recibo verifica HTTP fallido sin volver a generar un resultado ya guardado. Gemini está simulado en estas pruebas. La ejecución GitHub 40571060672 tiene pasos exitosos y recibo HTTP `idle` correlacionado con el Site, pero hay huecos de varias horas entre ejecuciones del principal. Esto impide certificar cadencia 24/7. No confundir éxito de una ejecución con cumplimiento del cron configurado. Punto 3, correo/calendario y acceso externo permanecen pendientes de validación independiente. Evidencia: `evidence/leo-executor-stage4-2026-10-27.json`.
++
++## Disparador Supabase — 28 octubre 2026
++
++Se integra el programador del proyecto existente `udispwzwrebjkanudcoy` con
++credencial exclusiva y procedencia `supabase-cron`. No se mueve la cola ni se
++crea otro agente. El principal se selecciona en el tablero del Site; GitHub
++no puede ejecutar pendientes cuando Supabase es el principal. La pausa global
++prevalece en ambos. Los contextos repetidos recuperan el recibo guardado, sin
++procesar otro trabajo. Los recibos HTTP/SQL deben coincidir por UUID de ciclo,
++proyecto, programación, fecha y estado. Configurar un cron no acredita su
++frecuencia: se requiere observar disparos automáticos y recibos reales.
++
++117 pruebas locales del agente y 10 del cliente GitHub aprobadas; los nuevos
++casos usan Gemini simulado. La activación y sus pruebas reales se conservan
++por separado en evidencia del despliegue. Correo/calendario continúan pendientes
++por OAuth de Google y las voces siguen fuera del alcance de este cambio.
+diff --git a/docs/ops/SUPABASE-RUNNER-CREDENTIALS.md b/docs/ops/SUPABASE-RUNNER-CREDENTIALS.md
+index 1809ac8..9ce07da 100644
+--- a/docs/ops/SUPABASE-RUNNER-CREDENTIALS.md
++++ b/docs/ops/SUPABASE-RUNNER-CREDENTIALS.md
+@@ -7,16 +7,28 @@ se incluye en el código, el navegador, esta documentación o los recibos.
+ La verificación de servicio usa POST al `/internal/runner` del Site original,
+ sin cuerpo, con `OAI-Sites-Authorization` y `x-supabase-runner-key`. No mezclar
+ esta cabecera con `x-agent-runner-key`, reservada al ejecutor existente de GitHub.
+-La credencial nueva no admite contexto GitHub ni declaraciones de programación.
++La credencial nueva no admite contexto GitHub. Un contexto automático de Supabase
++requiere proyecto y programación exactos, UUID de ciclo y fecha de menos de cinco
++minutos. Sus recibos se identifican como `supabase-cron`; repetir el mismo ciclo
++recupera el recibo sin ejecutar otro trabajo.
+ Respeta la pausa global y utiliza la misma cola y el mismo bloqueo del trabajador.
+ 
+ El recibo se identifica como `supabase-service`, queda separado en
+ `supabase_service_receipt` y no reemplaza el recibo principal de GitHub. Una
+ comprobación manual de acceso no acredita un disparo automático ni una cadencia.
+ 
+-No se ha instalado ni activado un cron por configurar estas credenciales.
+-La integración del disparador automático requiere una fase independiente con
+-procedencia Supabase, recibos correlacionados y cambio explícito del principal.
++El cron `fabrica-queue` se instala inactivo mediante
++`supabase-scheduler-install.sql`. Activarlo exige que el principal del Site sea
++`supabase:udispwzwrebjkanudcoy:fabrica-queue`. La cola, pausa y límites gratuitos
++siguen en el Site. Los disparos automáticos anteriores de GitHub quedan detenidos
++por el control de principal, incluso si ya estaban encolados.
++
++El cron revisa cada minuto; un diferimiento de cuota o fecha futura evita nuevas
++llamadas HTTP hasta la fecha indicada por el Site. Solo hay una solicitud HTTP
++pendiente por vez. Los recibos SQL se contrastan con los del Site y se conservan
++siete días. Los secretos se obtienen de Vault al ejecutar, nunca de `cron.job`.
++Una respuesta HTTP 200 con un recibo ajeno no acredita ejecución. La preparación
++inactiva y las pruebas manuales no acreditan disparos automáticos.
+ 
+ La clave de GitHub y la del CRM se conservan. Si se revoca esta integración,
+ retirar únicamente `SUPABASE_RUNNER_SECRET` y los dos secretos de Vault de arriba;
+diff --git a/scripts/test-agent.mjs b/scripts/test-agent.mjs
+index dac9906..49cc3e0 100644
+--- a/scripts/test-agent.mjs
++++ b/scripts/test-agent.mjs
+@@ -277,5 +277,22 @@ await test('Credencial Supabase aislada: acceso, pausa y contexto sin impersonar
+  await local.prepare("INSERT INTO settings VALUES('automation',?)").bind(JSON.stringify({enabled:false})).run();
+  assert.equal((await (await call(sb)).json()).run.status,'paused');assert.equal(calls,0);
+ });
++await test('Cron Supabase: contexto propio, ejecución única, recibos y rechazo del principal anterior',async()=>{
++ const local=new D1();local.db.exec(migration);const schedule='supabase:udispwzwrebjkanudcoy:fabrica-queue';
++ await local.prepare("INSERT INTO settings VALUES('automation',?)").bind(JSON.stringify({enabled:true,id:schedule})).run();
++ const key='supabase-separate-secret-with-32-characters',gh='github-existing-secret-with-32-characters';const e={...env,DB:local,SUPABASE_RUNNER_SECRET:key,AGENT_RUNNER_SECRET:gh};
++ const context={provider:'supabase-cron',project_id:'udispwzwrebjkanudcoy',schedule_id:schedule,event:'schedule',run_id:crypto.randomUUID(),scheduled_at:Date.now()};
++ const call=c=>worker.fetch(new Request('https://example.test/internal/runner',{method:'POST',headers:{'x-supabase-runner-key':key},body:JSON.stringify(c)}),e);
++ let calls=0;globalThis.fetch=async()=>{calls++;return answer('Una sola entrega');};await enqueue(local,{id:'supabase-exact-once',kind:'task',title:'Texto',text:'Ejercicio sintético'},Date.now()-1000);
++ for(const c of [{...context,project_id:'another-project'},{...context,scheduled_at:Date.now()-600000},{...context,event:'manual'},{...context,provider:'github-actions'}])assert.equal((await call(c)).status,400);
++ const result=await (await call(context)).json();assert.equal(result.run.status,'done');assert.equal(result.receipt.source,'supabase-cron');assert.equal(result.receipt.supabase.run_id,context.run_id);
++ const replay=await (await call(context)).json();assert.deepEqual(replay,result);assert.equal(calls,1);assert.equal((await call({...context,scheduled_at:context.scheduled_at+1})).status,409);
++ const h=await continuity(local);assert.equal(h.primary.recent,true);assert.equal(h.primary.last_cycle.source,'supabase-cron');assert.equal(JSON.parse((await board(local)).jobs[0].evidence).execution_source,'supabase-cron');
++ await enqueue(local,{id:'do-not-run-old-primary',kind:'task',title:'Texto',text:'Conservar pendiente'},Date.now()-1000);
++ const old={provider:'github-actions',repository:'Rick2818/Fabrica-de-Agentes-IA',repository_id:'1432658222',run_id:'999',run_attempt:'1',event:'schedule',commit_sha:'a'.repeat(40)};
++ const oldResponse=await worker.fetch(new Request('https://example.test/internal/runner',{method:'POST',headers:{'x-agent-runner-key':gh},body:JSON.stringify(old)}),e);assert.equal((await oldResponse.json()).run.status,'paused');assert.equal(calls,1);
++ await local.prepare("UPDATE settings SET value=? WHERE key='automation'").bind(JSON.stringify({enabled:false,id:schedule})).run();
++ const paused=await (await call({...context,run_id:crypto.randomUUID(),scheduled_at:Date.now()})).json();assert.equal(paused.run.status,'paused');assert.equal(calls,1);
++});
+ globalThis.fetch=originalFetch;
+ console.log(JSON.stringify({passed:checks.length,scope:'Local SQL real; Gemini simulado para fallos, cancelación y recuperación.',checks}));
+diff --git a/web/app.js b/web/app.js
+index 4dd61dd..da5c397 100644
+--- a/web/app.js
++++ b/web/app.js
+@@ -64,7 +64,7 @@ function renderNotifications(){
+  const h=state.health?.autonomy,latest=h?.last_scheduled_cycle;
+  $('continuity-status').textContent=h?.status==='paused'?'Pausaste el trabajo programado. Los encargos se conservan.':h?.status==='stopped'?'La programación se encontró detenida. Tu avance está guardado.':h?.status==='degraded'?'El respaldo registra actividad, pero falta un recibo reciente del ejecutor principal. Revisá su programación.':h?.status==='attention'?'Una comprobación del programador o su supervisor necesita atención. Tu avance está guardado.':h?.stalled?'Hay pendientes atrasados y falta una comprobación reciente del ejecutor.':latest?'Último ciclo registrado en nube: '+date(latest.completed_at)+'. '+(h.status==='recent'?'Hay actividad reciente.':'Falta una comprobación reciente.'):'Esperando el primer recibo de la programación. La configuración por sí sola no acredita ejecución.';
+  const cycles=$('cycle-list');cycles.replaceChildren();
+- for(const c of (h?.cycles||[]).slice(0,12))cycles.append(make('p','schedule-info',date(c.started_at)+' · '+(c.source==='github-actions-manual'||c.source==='github-actions'&&!/^\d+-1$/.test(c.cycle_id)?'GitHub · reejecución o disparo manual':c.source==='github-actions'?'GitHub · disparo automático':c.source==='scheduled'?'Programación declarada':'Herramienta')+' · '+(labels[c.status]||c.status)));
++ for(const c of (h?.cycles||[]).slice(0,12))cycles.append(make('p','schedule-info',date(c.started_at)+' · '+(c.source==='github-actions-manual'||c.source==='github-actions'&&!/^\d+-1$/.test(c.cycle_id)?'GitHub · reejecución o disparo manual':c.source==='github-actions'?'GitHub · disparo automático':c.source==='supabase-cron'?'Supabase · disparo automático':c.source==='scheduled'?'Programación declarada':'Herramienta')+' · '+(labels[c.status]||c.status)));
+  if(!h?.cycles?.length)cycles.append(make('p','schedule-info','Todavía no hay ciclos registrados.'));
+ }
+ 
+diff --git a/worker/runtime.mjs b/worker/runtime.mjs
+index df37615..27c64c2 100644
+--- a/worker/runtime.mjs
++++ b/worker/runtime.mjs
+@@ -74,7 +74,7 @@ export async function continuity(db,now=Date.now()){
+  const cycles=await rows(db,'SELECT * FROM agent_cycles ORDER BY started_at DESC,id DESC LIMIT 40');
+  // Re-runs inherit GitHub's original event='schedule'. Their attempt number
+  // must not refresh evidence of an automatic scheduler firing.
+- const automatic=c=>c.completed_at&&(c.source==='scheduled'||c.source==='github-actions'&&/^\d+-1$/.test(c.cycle_id));
++ const automatic=c=>c.completed_at&&(c.source==='scheduled'||c.source==='supabase-cron'||c.source==='github-actions'&&/^\d+-1$/.test(c.cycle_id));
+  const latest=cycles.find(automatic);
+  const manual=cycles.find(c=>c.completed_at&&(c.source==='github-actions-manual'||c.source==='github-actions'&&!/^\d+-1$/.test(c.cycle_id)));
+  const raw=await first(db,"SELECT value FROM settings WHERE key='scheduler_check'");
+@@ -82,10 +82,11 @@ export async function continuity(db,now=Date.now()){
+  let check=null,watchdog=null;try{check=JSON.parse(raw?.value||'null');watchdog=JSON.parse(watcher?.value||'null')}catch{}
+  const active=await first(db,"SELECT count(*) AS n,MIN(CASE WHEN status='running' THEN lease_until ELSE next_attempt_at END) AS due FROM jobs WHERE status IN ('queued','waiting','running')");
+  const configuration=await first(db,"SELECT value FROM settings WHERE key='automation'");let enabled=false,configured=null;try{configured=JSON.parse(configuration?.value||'null');enabled=configured?.enabled===true}catch{}
+- const primary=typeof configured?.id==='string'?await first(db,"SELECT * FROM agent_cycles WHERE schedule_id=? AND (source='scheduled' OR (source='github-actions' AND cycle_id GLOB '[0-9]*-1')) AND completed_at IS NOT NULL ORDER BY completed_at DESC,id DESC LIMIT 1",configured.id):latest;
++ const primary=typeof configured?.id==='string'?await first(db,"SELECT * FROM agent_cycles WHERE schedule_id=? AND (source IN ('scheduled','supabase-cron') OR (source='github-actions' AND cycle_id GLOB '[0-9]*-1')) AND completed_at IS NOT NULL ORDER BY completed_at DESC,id DESC LIMIT 1",configured.id):latest;
+  const backup=typeof configured?.id==='string'?cycles.find(c=>automatic(c)&&c.schedule_id!==configured.id):null;
+- const primaryStale=!primary||now-primary.completed_at>(primary.source==='github-actions'?45:90)*60000;
+- const stale=!latest||now-latest.completed_at>(latest.source==='github-actions'?45:90)*60000;
++ const freshness=c=>c?.source==='supabase-cron'?5:c?.source==='github-actions'?45:90;
++ const primaryStale=!primary||now-primary.completed_at>freshness(primary)*60000;
++ const stale=!latest||now-latest.completed_at>freshness(latest)*60000;
+  const observedDisabled=check&&now-check.checked_at<90*60000&&!check.is_enabled;
+  const attention=(check&&now-check.checked_at<90*60000&&(check.requires_user_action||check.status==='failed'))||(watchdog&&now-watchdog.checked_at<90*60000&&(!watchdog.is_enabled||watchdog.requires_user_action||watchdog.status==='failed'));
+  const runnerError=primary&&['failed','error'].includes(primary.status)&&!primaryStale;
+@@ -124,17 +125,17 @@ export async function board(db,now=Date.now(),env={}){
+  let cloud=null,last=null;try{cloud=JSON.parse(automation?.value||'null');last=JSON.parse(lastRun?.value||'null')}catch{}
+  const receipt=await first(db,"SELECT value FROM settings WHERE key='cloud_runner_receipt'");
+  const [notifications,autonomy]=await Promise.all([rows(db,'SELECT * FROM notifications ORDER BY created_at DESC,id DESC LIMIT 100'),continuity(db,now)]);
+- return {jobs,messages,notes,objectives,updates,notifications,commercial:await commercialBoard(db),usage:{used:usage.n,limit:20},automation:cloud,model:MODEL,server_time:now,health:{configured:!!env.GOOGLE_GENERATIVE_AI_API_KEY,next_run_at:runner?.expires>now?runner.expires:null,last_run:last,cloud_runner:receipt?JSON.parse(receipt.value):null,autonomy}};
++ return {jobs,messages,notes,objectives,updates,notifications,commercial:await commercialBoard(db),usage:{used:usage.n,limit:20},automation:cloud,model:MODEL,server_time:now,health:{configured:!!env.GOOGLE_GENERATIVE_AI_API_KEY,next_run_at:runner?.expires>now?runner.expires:null,last_run:last,cloud_runner:receipt?JSON.parse(receipt.value):null,supabase_runner:await trainingGet(db,'supabase_runner_receipt'),autonomy}};
+ }
+ export async function runRecordedCycle(db,env,a={},now=Date.now()){
+  const scheduled=a.trigger==='scheduled';
+  if(a.trigger!=null&&!['scheduled','manual'].includes(a.trigger))throw Object.assign(Error('Disparador inválido.'),{status:400});
+  if(scheduled&&(!text(a.cycle_id,200)||!text(a.schedule_id,200)))throw Object.assign(Error('La ejecución programada necesita el identificador del registro y de su programación.'),{status:400});
+- const id=crypto.randomUUID(),source=scheduled?(env.RUN_SOURCE==='github-actions'?(env.GITHUB_AUTOMATIC===false?'github-actions-manual':'github-actions'):'scheduled'):'mcp',cycleId=scheduled?a.cycle_id:id;
++ const id=crypto.randomUUID(),source=scheduled?(env.RUN_SOURCE==='supabase-cron'?'supabase-cron':env.RUN_SOURCE==='github-actions'?(env.GITHUB_AUTOMATIC===false?'github-actions-manual':'github-actions'):'scheduled'):'mcp',cycleId=scheduled?a.cycle_id:id;
+  await stmt(db,"INSERT INTO agent_cycles(id,cycle_id,schedule_id,source,status,started_at) VALUES(?,?,?,?,'running',?)",id,cycleId,scheduled?a.schedule_id:'',source,now).run();
+  try{
+-  if(scheduled){const setting=await first(db,"SELECT value FROM settings WHERE key='automation'");let paused=false;try{paused=JSON.parse(setting?.value||'null')?.enabled===false}catch{}if(paused){await stmt(db,"UPDATE agent_cycles SET status='paused',completed_at=? WHERE id=?",Math.max(now,Date.now()),id).run();return {status:'paused'};}}
+-  const run=await runNext(db,{...env,RUN_SOURCE:scheduled?(source.startsWith('github-actions')?source:'scheduled-mcp'):'mcp'},now);
++  if(scheduled){const setting=await first(db,"SELECT value FROM settings WHERE key='automation'");let paused=false;try{const config=JSON.parse(setting?.value||'null');paused=config?.enabled===false||(source==='supabase-cron'&&config?.id!==a.schedule_id)||(source.startsWith('github-actions')&&config?.id?.startsWith('supabase:'))}catch{}if(paused){await stmt(db,"UPDATE agent_cycles SET status='paused',completed_at=? WHERE id=?",Math.max(now,Date.now()),id).run();return {status:'paused'};}}
++  const run=await runNext(db,{...env,RUN_SOURCE:scheduled?(source==='supabase-cron'||source.startsWith('github-actions')?source:'scheduled-mcp'):'mcp'},now);
+   await stmt(db,'UPDATE agent_cycles SET status=?,job_id=?,completed_at=? WHERE id=?',run.status,run.id||null,Math.max(now,Date.now()),id).run();
+   await syncNotifications(db);
+   return run;
+@@ -433,23 +434,26 @@ async function cloudRunner(request,env){
+  if(!env.DB)return json({error:'Almacenamiento no disponible.'},503);
+  let context=null;
+  const raw=await request.text();if(raw.length>1500)return json({error:'Solicitud demasiado larga.'},413);
+- // This service credential cannot impersonate GitHub's schedule/context.
+- // Until a Supabase scheduler is explicitly integrated, its calls are manual
+- // service checks and must not count as automatic scheduling evidence.
+- if(supabase&&raw.trim())return json({error:'La credencial de Supabase no admite contexto de GitHub ni programación declarada.'},400);
+  if(raw.trim()){
+   try{context=JSON.parse(raw)}catch{return json({error:'Contexto inválido.'},400)}
+-  if(!context||Array.isArray(context)||context.provider!=='github-actions'||context.repository_id!=='1432658222'||context.repository!=='Rick2818/Fabrica-de-Agentes-IA'||typeof context.run_id!=='string'||!/^\d{1,30}$/.test(context.run_id)||typeof context.run_attempt!=='string'||!/^\d{1,5}$/.test(context.run_attempt)||!['schedule','workflow_dispatch'].includes(context.event)||typeof context.commit_sha!=='string'||!/^[a-f0-9]{40}$/.test(context.commit_sha))return json({error:'Contexto de ejecución no permitido.'},400);
+-  context=Object.fromEntries(['provider','repository_id','repository','run_id','run_attempt','event','commit_sha'].map(key=>[key,context[key]]));
++  if(supabase){
++   if(!context||Array.isArray(context)||context.provider!=='supabase-cron'||context.project_id!=='udispwzwrebjkanudcoy'||context.schedule_id!=='supabase:udispwzwrebjkanudcoy:fabrica-queue'||context.event!=='schedule'||typeof context.run_id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(context.run_id)||!Number.isSafeInteger(context.scheduled_at)||Math.abs(Date.now()-context.scheduled_at)>300000)return json({error:'Contexto de Supabase no permitido.'},400);
++   context=Object.fromEntries(['provider','project_id','schedule_id','event','run_id','scheduled_at'].map(key=>[key,context[key]]));
++   const cached=await trainingGet(env.DB,'supabase_cycle_receipt:'+context.run_id);
++   if(cached){if(JSON.stringify(cached.receipt.supabase)!==JSON.stringify(context))return json({error:'El identificador del ciclo ya tiene otro contexto.'},409);return json(cached);}
++  }else{
++   if(!context||Array.isArray(context)||context.provider!=='github-actions'||context.repository_id!=='1432658222'||context.repository!=='Rick2818/Fabrica-de-Agentes-IA'||typeof context.run_id!=='string'||!/^\d{1,30}$/.test(context.run_id)||typeof context.run_attempt!=='string'||!/^\d{1,5}$/.test(context.run_attempt)||!['schedule','workflow_dispatch'].includes(context.event)||typeof context.commit_sha!=='string'||!/^[a-f0-9]{40}$/.test(context.commit_sha))return json({error:'Contexto de ejecución no permitido.'},400);
++   context=Object.fromEntries(['provider','repository_id','repository','run_id','run_attempt','event','commit_sha'].map(key=>[key,context[key]]));
++  }
+  }
+  const started_at=Date.now();
+  const pauseSetting=await first(env.DB,"SELECT value FROM settings WHERE key='automation'");let servicePaused=false;try{servicePaused=JSON.parse(pauseSetting?.value||'null')?.enabled===false}catch{}
+- const run=context?await runRecordedCycle(env.DB,{...env,RUN_SOURCE:'github-actions',GITHUB_AUTOMATIC:context.event==='schedule'&&context.run_attempt==='1'},{trigger:'scheduled',cycle_id:context.run_id+'-'+context.run_attempt,schedule_id:'github:'+context.repository_id}):servicePaused?{status:'paused'}:await runNext(env.DB,{...env,RUN_SOURCE:supabase?'supabase-service':'service-runner'});
++ const run=context?supabase?await runRecordedCycle(env.DB,{...env,RUN_SOURCE:'supabase-cron'},{trigger:'scheduled',cycle_id:context.run_id,schedule_id:context.schedule_id}):await runRecordedCycle(env.DB,{...env,RUN_SOURCE:'github-actions',GITHUB_AUTOMATIC:context.event==='schedule'&&context.run_attempt==='1'},{trigger:'scheduled',cycle_id:context.run_id+'-'+context.run_attempt,schedule_id:'github:'+context.repository_id}):servicePaused?{status:'paused'}:await runNext(env.DB,{...env,RUN_SOURCE:supabase?'supabase-service':'service-runner'});
+  const pending=await first(env.DB,"SELECT count(*) AS n,MIN(CASE WHEN status='running' THEN lease_until ELSE next_attempt_at END) AS next_at FROM jobs WHERE status IN ('queued','waiting','running')");
+  await syncNotifications(env.DB);
+- const receipt={started_at,completed_at:Date.now(),source:context?'github-actions':supabase?'supabase-service':'service-runner',status:run.status,job_id:run.id||null,pending:pending.n,next_at:Math.max(run.next_at||0,pending.next_at||0)||null,...(context?{github:context}:{})};
++ const receipt={started_at,completed_at:Date.now(),source:context?(supabase?'supabase-cron':'github-actions'):supabase?'supabase-service':'service-runner',status:run.status,job_id:run.id||null,pending:pending.n,next_at:Math.max(run.next_at||0,pending.next_at||0)||null,...(context?(supabase?{supabase:context}:{github:context}):{})};
+  // A manual credential check must not replace the principal GitHub receipt.
+- if(supabase)await stmt(env.DB,"INSERT INTO settings(key,value) VALUES('supabase_service_receipt',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify(receipt)).run();
++ if(supabase){await trainingSet(env.DB,context?'supabase_runner_receipt':'supabase_service_receipt',receipt);if(context){await trainingSet(env.DB,'supabase_cycle_receipt:'+context.run_id,{run,receipt});await stmt(env.DB,"DELETE FROM settings WHERE key LIKE 'supabase_cycle_receipt:%' AND json_extract(value,'$.receipt.completed_at')<?",Date.now()-3600000).run();}}
+  else await stmt(env.DB,"INSERT INTO settings(key,value) VALUES('cloud_runner_receipt',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify(receipt)).run();
+  return json({run,receipt});
+ }
