@@ -1,0 +1,24 @@
+{
+  "site": "https://agente-ricardo-revision-rick.glassybell1025.chatgpt.site",
+  "version": 49,
+  "source_commit": "c5afe1cf62805ded1380c9f42af444fd863dd2ad",
+  "deployment_id": "appgdep_6ae1570b5f3481918cd9abd714c75d59",
+  "deployment_status": "succeeded",
+  "tests": {
+    "agent": 113,
+    "cloud_runner": 10,
+    "public_tools": "passed",
+    "crm_adapter": "passed",
+    "build": "passed",
+    "artifact": "passed"
+  },
+  "patch_commit": "4d000a1ff4de01f2ba55e6d82fa928705ea6744a",
+  "original_403_cause": "undetermined",
+  "real_test": "Not executed; creation of new task rejected by automatic approval review under retained no-new-task instruction. No bypass or new task.",
+  "audience": "custom preserved",
+  "provider_model": "unchanged",
+  "not_certified": [
+    "Governance correction",
+    "real upstream 403 reproduction"
+  ]
+}
