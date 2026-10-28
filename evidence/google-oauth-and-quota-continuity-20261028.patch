@@ -1,0 +1,332 @@
+diff --git a/scripts/build.mjs b/scripts/build.mjs
+index a0738f8..006442f 100644
+--- a/scripts/build.mjs
++++ b/scripts/build.mjs
+@@ -5,6 +5,8 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+ const assets=Object.fromEntries(['index.html','style.css','app.js','entrenamiento.html','entrenamiento.css','entrenamiento.js','expression.js','expression-player.js','expression.css','mascotas.css','vibrant-agents.css','i18n.js','mascot-expressions.css','mascot-expressions.js','agent-status.css','agent-status.js','factory-voice.js','voice-profiles.js','piper-tts-web.js','piper-o91UDS6e.js'].map(name=>[name,readFileSync(resolve(root,'web',name),'utf8')]));
+ let runtime=readFileSync(resolve(root,'worker/runtime.mjs'),'utf8');
+ for(const name of ['leo-crm.html','leo-crm.css','leo-crm.js'])assets[name]=readFileSync(resolve(root,'web',name),'utf8');
++for(const name of ['conexiones.html','google-connections.js'])assets[name]=readFileSync(resolve(root,'web',name),'utf8');
++runtime=runtime.replace("import {googleConnection} from './google-connection.mjs';",readFileSync(resolve(root,'worker/google-connection.mjs'),'utf8').replace(/export (const|async function|function) /g,'$1 '));
+ runtime=runtime.replace("import {leoCRM} from './leo-crm.mjs';",readFileSync(resolve(root,'worker/leo-crm.mjs'),'utf8').replace(/export (const|async function|function) /g,'$1 '));
+ for(const [file,names] of [['agent-tools',['AGENT_TOOL_DECLARATIONS','AGENT_TOOL_INSTRUCTION','readPublicPage']],['expression',['EXPRESSION_SKILLS','expressionScore']],['sales-prospecting',['SALES_PROSPECTING_SKILL']],['specialty-skills',['SPECIALTY_SKILLS','selectedSpecialtySkills','SPECIALTY_TOOLKITS']],['specialist-tools',['specialistTool','SPECIALIST_OPERATIONS']],['leo-public-tools',['leoPublicTool']]]){
+  const imported=new RegExp("import \\{[^}]+\\} from '\\./"+file+"\\.mjs';");
+diff --git a/scripts/test-agent.mjs b/scripts/test-agent.mjs
+index cc7eeb2..cd8aa38 100644
+--- a/scripts/test-agent.mjs
++++ b/scripts/test-agent.mjs
+@@ -312,5 +312,11 @@ await test('Mila: chat contextual no guarda el borrador incorrecto en historial'
+ await test('Mila: objetivo no avanza de fase con una acción inventada',async()=>{
+  const local=new D1();local.db.exec(migration);await createObjective(local,goalInput('mila-evidence-goal'),now);globalThis.fetch=async()=>structured(plan);await runNext(local,env,now);let instruction;globalThis.fetch=async(_,request)=>{instruction=JSON.parse(request.body).systemInstruction.parts[0].text;return answer('El equipo técnico está revisando el caso.');};await runNext(local,env,now+14000);const b=await board(local);assert.equal(b.objectives[0].status,'working');assert.equal(b.jobs.find(j=>j.phase==='step').status,'waiting');assert.equal(b.jobs.filter(j=>j.phase==='verify').length,0);assert.match(instruction,/Acciones y soporte/);local.db.close();
+ });
++await test('Supabase: una espera por cuota correlacionada no simula atasco ni actividad reciente',async()=>{
++ const local=new D1();local.db.exec(migration);const schedule='supabase:udispwzwrebjkanudcoy:fabrica-queue',cycle='quota-wait-cycle',at=now-2*3600000,until=now+3600000;
++ await enqueue(local,{id:'quota-deferred-new-job',kind:'task',title:'Pendiente',text:'Prueba'},at);local.db.prepare("INSERT INTO settings VALUES('automation',?)").run(JSON.stringify({id:schedule,enabled:true}));local.db.prepare("INSERT INTO agent_cycles(id,cycle_id,schedule_id,source,status,started_at,completed_at) VALUES(?,?,?,'supabase-cron','quota',?,?)").run(cycle,cycle,schedule,at,at+1);local.db.prepare("INSERT INTO settings VALUES('supabase_runner_receipt',?)").run(JSON.stringify({status:'quota',next_at:until,supabase:{run_id:cycle}}));local.db.prepare("INSERT INTO runner_lock(id,token,expires) VALUES(1,'quota-test',?)").run(until);
++ let h=await continuity(local,now);assert.equal(h.status,'waiting');assert.equal(h.stalled,false);assert.equal(h.primary.recent,false);assert.equal(h.deferred_until,until);
++ h=await continuity(local,until+1);assert.equal(h.stalled,true);assert.notEqual(h.status,'waiting');local.db.prepare("UPDATE settings SET value=? WHERE key='supabase_runner_receipt'").run(JSON.stringify({status:'quota',next_at:until,supabase:{run_id:'wrong-cycle'}}));assert.equal((await continuity(local,now)).stalled,true);local.db.close();
++});
+ globalThis.fetch=originalFetch;
+ console.log(JSON.stringify({passed:checks.length,scope:'Local SQL real; Gemini simulado para fallos, cancelación y recuperación.',checks}));
+diff --git a/web/app.js b/web/app.js
+index da5c397..f5024c3 100644
+--- a/web/app.js
++++ b/web/app.js
+@@ -62,7 +62,7 @@ function renderNotifications(){
+  }
+  const toggle=$('autonomy-toggle');toggle.disabled=!state.automation;toggle.textContent=state.automation?.enabled===false?'Retomar trabajo programado':'Pausar trabajo programado';
+  const h=state.health?.autonomy,latest=h?.last_scheduled_cycle;
+- $('continuity-status').textContent=h?.status==='paused'?'Pausaste el trabajo programado. Los encargos se conservan.':h?.status==='stopped'?'La programación se encontró detenida. Tu avance está guardado.':h?.status==='degraded'?'El respaldo registra actividad, pero falta un recibo reciente del ejecutor principal. Revisá su programación.':h?.status==='attention'?'Una comprobación del programador o su supervisor necesita atención. Tu avance está guardado.':h?.stalled?'Hay pendientes atrasados y falta una comprobación reciente del ejecutor.':latest?'Último ciclo registrado en nube: '+date(latest.completed_at)+'. '+(h.status==='recent'?'Hay actividad reciente.':'Falta una comprobación reciente.'):'Esperando el primer recibo de la programación. La configuración por sí sola no acredita ejecución.';
++ $('continuity-status').textContent=h?.status==='paused'?'Pausaste el trabajo programado. Los encargos se conservan.':h?.status==='waiting'?'Espera programada hasta '+date(h.deferred_until)+'. Los pendientes están guardados; no se repiten llamadas durante la espera.':h?.status==='stopped'?'La programación se encontró detenida. Tu avance está guardado.':h?.status==='degraded'?'El respaldo registra actividad, pero falta un recibo reciente del ejecutor principal. Revisá su programación.':h?.status==='attention'?'Una comprobación del programador o su supervisor necesita atención. Tu avance está guardado.':h?.stalled?'Hay pendientes atrasados y falta una comprobación reciente del ejecutor.':latest?'Último ciclo registrado en nube: '+date(latest.completed_at)+'. '+(h.status==='recent'?'Hay actividad reciente.':'Falta una comprobación reciente.'):'Esperando el primer recibo de la programación. La configuración por sí sola no acredita ejecución.';
+  const cycles=$('cycle-list');cycles.replaceChildren();
+  for(const c of (h?.cycles||[]).slice(0,12))cycles.append(make('p','schedule-info',date(c.started_at)+' · '+(c.source==='github-actions-manual'||c.source==='github-actions'&&!/^\d+-1$/.test(c.cycle_id)?'GitHub · reejecución o disparo manual':c.source==='github-actions'?'GitHub · disparo automático':c.source==='supabase-cron'?'Supabase · disparo automático':c.source==='scheduled'?'Programación declarada':'Herramienta')+' · '+(labels[c.status]||c.status)));
+  if(!h?.cycles?.length)cycles.append(make('p','schedule-info','Todavía no hay ciclos registrados.'));
+diff --git a/web/entrenamiento.html b/web/entrenamiento.html
+index bd5462f..309c0a7 100644
+--- a/web/entrenamiento.html
++++ b/web/entrenamiento.html
+@@ -9,4 +9,4 @@
+ <section class="panel"><h2>Habilidades de la especialidad de ventas</h2><p><strong>Ayudar a personas con cuellos de botella reales en su trabajo.</strong> La mejora buscada es recuperar productividad, eficiencia y valor económico. El agente especialista será el medio para lograrla.</p><p>Primero se diagnostica el dolor y su impacto. Después se propone la especialidad y se acuerda cómo medir el resultado, sin prometer ahorros no comprobados.</p><p>Estamos definiendo y practicando esta especialidad. El producto o servicio, mercado, precios, fuentes y permisos se asignarán después.</p><ol><li>Buscar señales reales de necesidad y oportunidades de compra.</li><li>Calificar el encaje y descubrir qué necesita el comprador.</li><li>Preparar propuestas de valor con información aprobada.</li><li>Resolver objeciones y negociar dentro de condiciones autorizadas.</li><li>Dar seguimiento con contexto, sin duplicados y respetando bajas.</li><li>Pedir un compromiso concreto y distinguir aceptación de cobro.</li><li>Entregar el cierre con evidencia y pendientes claros.</li></ol><p>Plugins, fuentes y disparadores se conectarán al configurar cada agente. Esta etapa usa prácticas y recibos; no inicia campañas comerciales.</p></section><main><aside class="panel"><h2>Perfiles profesionales</h2><div id="profiles"></div><button id="new" type="button">+ Crear especialidad</button><p><small>Las fichas se sincronizan con la nube y conservan una copia en este navegador. Usá datos ficticios, sin datos personales ni secretos.</small></p></aside>
+ <section><div class="panel" id="sales-toolkit"><h2>Skill de prospección: dolores reales</h2><p><strong>Pegá este prompt para buscar oportunidades de venta.</strong> El agente conserva este procedimiento; lo adaptás al producto o servicio cuando se lo asignés.</p><label for="sales-prompt">Prompt reutilizable de búsqueda</label><textarea id="sales-prompt" readonly rows="12"></textarea><button id="copy-sales-prompt" type="button">Copiar prompt de búsqueda</button><button id="practice-sales-prompt" class="secondary" type="button">Usar en una práctica</button><p>Fuentes y plugins: búsqueda web, lectura de fuentes originales, directorio opcional y registro autorizado. Se comprueba el acceso al usarlos; este módulo no activa conexiones ni envíos.</p></div><div class="panel"><h2>Ficha del agente</h2><label for="name">Nombre del agente</label><input id="name" maxlength="90"><label for="specialty">Especialidad</label><select id="specialty"><option value="Ventas">Leo · Ventas</option><option value="Servicio al cliente">Mila · Servicio al cliente</option><option value="Mercadeo">Lía · Mercadeo</option><option value="Finanzas">Vera · Finanzas</option><option value="Química y farmacia">Alma · Química y farmacia</option><option value="Logística">Nico · Logística</option><option>Administración</option><option>Otra</option></select><label for="mission">Misión y límites</label><textarea id="mission" maxlength="3500"></textarea><label for="knowledge">Conocimientos y procedimientos aprobados</label><textarea id="knowledge" maxlength="12000" placeholder="Pegá manuales breves, información de productos, políticas y procedimientos; evitá datos personales o secretos."></textarea><label for="tools">Herramientas permitidas (descripción; sin credenciales)</label><textarea id="tools" maxlength="2500"></textarea><div><button id="save">Guardar ficha en la nube</button><button id="export" class="secondary">Exportar perfil JSON</button><button id="delete" class="secondary">Eliminar</button></div></div>
+ <div class="panel"><h2>Práctica y evaluación</h2><p>Definí una situación, la respuesta esperada y los criterios. Practicá con Gemini y recibí la respuesta aquí. El resultado y su recibo quedan guardados en la nube. Cada práctica consume la cuota gratuita; la revisión es manual.</p><label for="scenario">Situación de prueba</label><textarea id="scenario" maxlength="3000"></textarea><label for="criteria">Criterios de aprobación</label><textarea id="criteria" maxlength="3000"></textarea><label for="answer">Respuesta de Gemini</label><textarea id="answer" maxlength="30000" readonly placeholder="La respuesta aparecerá automáticamente al terminar la práctica."></textarea><label for="assessment">Resultado de revisión manual</label><select id="assessment"><option value="pending">Sin evaluar</option><option value="pass">Aprobado</option><option value="fail">Necesita mejoras</option></select><label for="feedback">Justificación de la revisión</label><textarea id="feedback" maxlength="2000" placeholder="Explicá qué criterios cumple o qué debe corregir."></textarea><button id="evaluate">Registrar evaluación</button><button id="practice" class="secondary">Practicar con Gemini</button><button id="retry" class="secondary" hidden>Reintentar práctica</button><button id="receipt" class="secondary" hidden>Descargar recibo</button><div id="result" aria-live="polite"></div><details><summary>Qué falta para operar autónomamente</summary><p>Quedan pendientes la búsqueda de documentos, permisos de herramientas, simulaciones y evaluación automáticas. Una aprobación manual no habilita acceso a correo, CRM ni operaciones reales.</p></details></div></section></main>
+-<script type="module" src="/entrenamiento.js"></script><script defer src="/i18n.js"></script><script defer src="/mascot-expressions.js"></script><a href="/leo-crm.html" class="agent-cta" style="display:inline-block;margin:24px" data-es="Leo · Abrir CRM y pedidos" data-en="Leo · Open CRM and orders">Leo · Abrir CRM y pedidos</a><script defer src="/agent-status.js"></script></body></html>
++<script type="module" src="/entrenamiento.js"></script><script defer src="/i18n.js"></script><script defer src="/mascot-expressions.js"></script><a href="/leo-crm.html" class="agent-cta" style="display:inline-block;margin:24px" data-es="Leo · Abrir CRM y pedidos" data-en="Leo · Open CRM and orders">Leo · Abrir CRM y pedidos</a><script defer src="/agent-status.js"></script><a href="/conexiones.html">Correo y calendario · Conectar Google</a></body></html>
+diff --git a/web/index.html b/web/index.html
+index 6eea7ed..8cc38c2 100644
+--- a/web/index.html
++++ b/web/index.html
+@@ -7,4 +7,4 @@
+ <section id="memory" class="panel" hidden><h2>Memoria</h2><p>Guardá preferencias y decisiones. El agente las recibirá como contexto en sus siguientes respuestas.</p><form id="note-form" class="record-form"><label>Título<input id="note-title" required maxlength="120" placeholder="Forma de responder"></label><label>Nota<textarea id="note-content" required maxlength="4000" placeholder="Prefiero respuestas breves en español."></textarea></label><button class="primary" type="submit">Guardar nota</button></form><p class="footnote">Usar el mismo título actualiza esa nota.</p><div id="note-list"></div></section>
+ <section id="notifications" class="panel" hidden><h2>Tus avisos</h2><p>Las entregas, los bloqueos y las interrupciones quedan guardados aquí, aunque cierres la página.</p><p id="continuity-status" class="schedule-info" role="status"></p><button type="button" id="autonomy-toggle" class="secondary">Pausar trabajo programado</button><p class="schedule-info">Esta pausa detiene el trabajo programado del agente y su recuperación automática; tus encargos se conservan.</p><div id="notification-list" aria-live="polite"></div><details><summary>Actividad en la nube</summary><div id="cycle-list"></div></details></section>
+ <section id="learn" class="panel learn" hidden><h2>Así funciona tu agente</h2><div class="lesson"><span>01</span><div><h3>Gemini entiende el objetivo</h3><p>Recibe tu mensaje, el historial reciente y tus notas. Puede redactar, explicar y planificar a partir de la información que le proporcionés.</p></div></div><div class="lesson"><span>02</span><div><h3>El trabajo queda guardado</h3><p>El historial, las notas y los encargos se conservan en la nube. Tus dos cuentas autorizadas acceden al mismo espacio personal.</p></div></div><div class="lesson"><span>03</span><div><h3>Una cola organiza las tareas</h3><p>El servidor ejecuta los encargos uno por uno, guarda el resultado y registra el modelo y la fecha de respuesta. Si falla, conserva el encargo para reintentar; podés cancelarlo.</p></div></div><div class="lesson"><span>04</span><div><h3>Alcance de esta versión</h3><p>Esta implementación es independiente del código interno de ChatGPT. No navega por Internet, envía correos, realiza pagos ni controla otras aplicaciones. El código original con eve se conserva aparte.</p></div></div><div class="lesson"><span>05</span><div><h3>Referencia funcional y objetivo</h3><p>La meta es desarrollar capacidades de agentes mediante una implementación propia e independiente. Esta primera versión tiene conversación, notas y tareas; los objetivos autónomos incorporan planificación, pasos y revisión. Todavía faltan navegador propio, integraciones externas y delegación paralela. Habla, animación y canto sintético requieren una sesión web compatible. <a href="https://learn.chatgpt.com/docs/dots" target="_blank" rel="noopener noreferrer">Consultar la documentación oficial de Dots</a>.</p></div></div><p id="quota" class="schedule-info"></p><button class="secondary" data-view="tasks">Ir a mis tareas</button></section>
+-</section></main></div><script src="/app.js"></script><script type="module" src="/expression.js"></script><script defer src="/i18n.js"></script><script type="module" src="/factory-voice.js"></script><script defer src="/mascot-expressions.js"></script><a href="/leo-crm.html" class="agent-cta" style="display:inline-block;margin:24px" data-es="Leo · Abrir CRM y pedidos" data-en="Leo · Open CRM and orders">Leo · Abrir CRM y pedidos</a><script defer src="/agent-status.js"></script></body></html>
++</section></main></div><script src="/app.js"></script><script type="module" src="/expression.js"></script><script defer src="/i18n.js"></script><script type="module" src="/factory-voice.js"></script><script defer src="/mascot-expressions.js"></script><a href="/leo-crm.html" class="agent-cta" style="display:inline-block;margin:24px" data-es="Leo · Abrir CRM y pedidos" data-en="Leo · Open CRM and orders">Leo · Abrir CRM y pedidos</a><script defer src="/agent-status.js"></script><a href="/conexiones.html">Correo y calendario · Conectar Google</a></body></html>
+diff --git a/web/leo-crm.html b/web/leo-crm.html
+index 794525d..92fd400 100644
+--- a/web/leo-crm.html
++++ b/web/leo-crm.html
+@@ -17,4 +17,4 @@
+ <section class="panel"><div class="section-heading"><h2 data-es="Pedidos y oportunidades" data-en="Orders and opportunities">Pedidos y oportunidades</h2><button id="refresh" class="secondary" type="button" data-es="Actualizar" data-en="Refresh">Actualizar</button></div>
+ <form id="lookup"><label for="order-number" data-es="Buscar por número de pedido" data-en="Look up an order number">Buscar por número de pedido</label><div class="lookup"><input id="order-number" type="text" inputmode="numeric" pattern="[0-9]{1,15}" required maxlength="15"><button type="submit" data-es="Consultar" data-en="Look up">Consultar</button></div></form>
+ <div id="lookup-result" role="status" aria-live="polite"></div><div id="orders"></div><div id="opportunities"></div></section></div>
+-</main><script src="/leo-crm.js" defer></script></body></html>
++</main><script src="/leo-crm.js" defer></script><a href="/conexiones.html">Correo y calendario · Conectar Google</a></body></html>
+diff --git a/worker/runtime.mjs b/worker/runtime.mjs
+index dde7389..868da52 100644
+--- a/worker/runtime.mjs
++++ b/worker/runtime.mjs
+@@ -2,6 +2,7 @@ import {AGENT_TOOL_DECLARATIONS,AGENT_TOOL_INSTRUCTION,readPublicPage} from './a
+ import {SALES_PROSPECTING_SKILL} from './sales-prospecting.mjs';
+ import {leoPublicTool} from './leo-public-tools.mjs';
+ import {leoCRM} from './leo-crm.mjs';
++import {googleConnection} from './google-connection.mjs';
+ import {EXPRESSION_SKILLS,expressionScore} from './expression.mjs';
+ import {SPECIALTY_SKILLS,selectedSpecialtySkills,SPECIALTY_TOOLKITS} from './specialty-skills.mjs';
+ import {specialistTool,SPECIALIST_OPERATIONS} from './specialist-tools.mjs';
+@@ -101,14 +102,17 @@ export async function continuity(db,now=Date.now()){
+  const backup=typeof configured?.id==='string'?cycles.find(c=>automatic(c)&&c.schedule_id!==configured.id):null;
+  const freshness=c=>c?.source==='supabase-cron'?5:c?.source==='github-actions'?45:90;
+  const primaryStale=!primary||now-primary.completed_at>freshness(primary)*60000;
++ const supabaseReceipt=await trainingGet(db,'supabase_runner_receipt');
++ const runnerWait=await first(db,'SELECT expires FROM runner_lock WHERE id=1');
++ const deferredUntil=enabled&&primary?.source==='supabase-cron'&&['quota','waiting','busy'].includes(primary.status)&&supabaseReceipt?.supabase?.run_id===primary.cycle_id&&supabaseReceipt.status===primary.status&&Number.isSafeInteger(supabaseReceipt.next_at)&&supabaseReceipt.next_at>now&&runnerWait?.expires>=supabaseReceipt.next_at?supabaseReceipt.next_at:null;
+  const stale=!latest||now-latest.completed_at>freshness(latest)*60000;
+  const observedDisabled=check&&now-check.checked_at<90*60000&&!check.is_enabled;
+  const attention=(check&&now-check.checked_at<90*60000&&(check.requires_user_action||check.status==='failed'))||(watchdog&&now-watchdog.checked_at<90*60000&&(!watchdog.is_enabled||watchdog.requires_user_action||watchdog.status==='failed'));
+  const runnerError=primary&&['failed','error'].includes(primary.status)&&!primaryStale;
+- const status=!enabled&&configuration?'paused':observedDisabled?'stopped':attention||runnerError?'attention':enabled&&configured?.id&&primaryStale?(latest&&!stale?'degraded':'unverified'):latest&&!stale?'recent':enabled?'unverified':'unconfigured';
++ const status=!enabled&&configuration?'paused':observedDisabled?'stopped':attention||runnerError?'attention':deferredUntil?'waiting':enabled&&configured?.id&&primaryStale?(latest&&!stale?'degraded':'unverified'):latest&&!stale?'recent':enabled?'unverified':'unconfigured';
+  // Heartbeats from either scheduler cannot hide a long-overdue queue item.
+- const stalled=active.n>0&&active.due!=null&&now-active.due>90*60000;
+- return {status,last_scheduled_cycle:latest||null,last_manual_cycle:manual||null,primary:{schedule_id:configured?.id||null,last_cycle:primary||null,recent:!primaryStale},backup:{last_cycle:backup||null,recent:!!backup&&now-backup.completed_at<=90*60000},cycles,scheduler_check:check,watchdog_check:watchdog,stalled,pending:active.n,oldest_due:active.due||null};
++ const stalled=!deferredUntil&&active.n>0&&active.due!=null&&now-active.due>90*60000;
++ return {status,deferred_until:deferredUntil,last_scheduled_cycle:latest||null,last_manual_cycle:manual||null,primary:{schedule_id:configured?.id||null,last_cycle:primary||null,recent:!primaryStale},backup:{last_cycle:backup||null,recent:!!backup&&now-backup.completed_at<=90*60000},cycles,scheduler_check:check,watchdog_check:watchdog,stalled,pending:active.n,oldest_due:active.due||null};
+ }
+ export async function recordSchedulerCheck(db,a,now=Date.now()){
+  if(!text(a.schedule_id,200)||typeof a.is_enabled!=='boolean'||typeof a.requires_user_action!=='boolean'||!['completed','in_progress','failed','no_update','unknown'].includes(a.status)||!(a.run_id==null||text(a.run_id,200)))throw Object.assign(Error('Comprobación inválida.'),{status:400});
+@@ -570,6 +574,7 @@ export default {async fetch(request,env,ctx){
+    if(!env.DB)return json({error:'El almacenamiento todavía no está disponible.'},503);
+    if(!['GET','HEAD'].includes(request.method)&&request.headers.get('origin')!==url.origin)return json({error:'Origen no permitido.'},403);
+    if(url.pathname==='/api/agents/leo/crm')return await leoCRM(request,env);
++   if(url.pathname.startsWith('/api/integrations/google/'))return await googleConnection(request,env);
+    if(url.pathname==='/api/opportunities'&&request.method==='GET')return json(await commercialBoard(env.DB));
+    if(url.pathname==='/api/expression/skills'&&request.method==='GET')return json({skills:EXPRESSION_SKILLS});
+    if(url.pathname==='/api/expression/score'&&request.method==='POST')return json(await saveExpression(env.DB,await parse(request)));
+diff --git a/docs/google-connection-20261028.md b/docs/google-connection-20261028.md
+new file mode 100644
+index 0000000..e953348
+--- /dev/null
++++ b/docs/google-connection-20261028.md
+@@ -0,0 +1,64 @@
++# Frente 3: conexión propia con Google
++
++Se conserva la identidad de ChatGPT Sites. Google OAuth es una autorización
++de fuentes por cada usuario y servicio, no un reemplazo de la sesión del Site.
++
++## Implementado
++
++`/conexiones.html`: estado, autorización independiente de Gmail y Calendar,
++consulta acotada y desconexión. Servidor: estado de un uso, PKCE S256, cookie
++HttpOnly Secure SameSite=Lax, verificación de identidad Sites, separación por
++usuario/servicio, tokens cifrados AES-GCM con AAD, renovación del servidor,
++rechazo de permisos más amplios y destinos fijos sin redirecciones HTTP.
++Las conexiones no se exponen en el tablero ni se pasan a Gemini.
++
++Solo lectura: Gmail muestra identificadores de hasta cinco mensajes, sin
++cuerpos; Calendar los próximos cinco eventos. No hay envío, marcado de
++lectura, modificación de citas ni invitaciones. No se realiza consentimiento
++automático en nombre de nadie.
++
++## Configuración que falta
++
++En Google Cloud del propietario de la Fábrica: un cliente OAuth de aplicación
++web y los servicios correspondientes habilitados. No se activó facturación
++ni se aceptaron permisos externos. Registrar exactamente esta redirección:
++
++`https://agente-ricardo-revision-rick.glassybell1025.chatgpt.site/api/integrations/google/callback`
++
++Secretos nativos del Site, nunca archivos del repositorio:
++
++- `GOOGLE_OAUTH_CLIENT_ID`
++- `GOOGLE_OAUTH_CLIENT_SECRET`
++- `GOOGLE_OAUTH_TOKEN_KEY`: clave propia de 32 bytes aleatorios en base64url,
++  generada al configurar la conexión. No reutilizar la clave del ejecutor.
++
++No existen esos valores en el Site revisado. Un operador puede preparar la
++clave de cifrado; el dato externo indispensable es el cliente OAuth de Google.
++Luego cada titular debe elegir su cuenta y consentir en Google. La publicación
++de este código no significa que Gmail o Calendar estén conectados.
++
++Antes de usar con clientes: comprobar configuración de audiencia, privacidad,
++retención y las condiciones/verificación de permisos que Google aplique al
++cliente y sus scopes. Google puede caducar o revocar el consentimiento; no se
++garantiza renovación indefinida. No se pidieron permisos en cuentas existentes.
++
++## Evidencia y alcance
++
++`scripts/test-google-connection.mjs`: diez comprobaciones con SQL real local y
++Google simulado: identidad, CSRF, configuración ausente, PKCE, cookie, estado
++por usuario, consumo único, cifrado, renovación, consulta autorizada, aislamiento,
++revocación y rechazo de permisos ampliados. No se acredita consentimiento ni
++lectura real de una cuenta. El estado publicado debe indicar configuración
++pendiente y mantener los botones deshabilitados.
++
++Referencias primarias revisadas el 28-10-2026:
++- https://developers.google.com/identity/protocols/oauth2/web-server
++- https://developers.google.com/identity/protocols/oauth2/scopes
++
++## Frente 1: espera de cuota
++
++El tablero distingue una espera justificada por cuota de falta de actividad.
++Solo aplica si coinciden UUID del recibo Supabase, estado y bloqueo de la cola
++hasta una fecha futura. No convierte esa espera en un ciclo nuevo ni actividad
++reciente. Al vencer la fecha vuelve a exigirse ejecución; un recibo de otro ciclo
++no suprime alertas. No se modifica el reloj, la cuota ni la fecha del pendiente.
+diff --git a/scripts/test-google-connection.mjs b/scripts/test-google-connection.mjs
+new file mode 100644
+index 0000000..26514fc
+--- /dev/null
++++ b/scripts/test-google-connection.mjs
+@@ -0,0 +1,28 @@
++import assert from 'node:assert/strict';
++import {DatabaseSync} from 'node:sqlite';
++import {googleConnection} from '../worker/google-connection.mjs';
++class GoogleTestDB{constructor(){this.db=new DatabaseSync(':memory:');this.db.exec('CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)');}prepare(sql){const owner=this;return{args:[],bind(...args){this.args=args;return this;},async first(){return owner.db.prepare(sql).get(...this.args)||null},async run(){return owner.db.prepare(sql).run(...this.args)}}}}
++const origin='https://agente-ricardo-revision-rick.glassybell1025.chatgpt.site',base=origin+'/api/integrations/google';
++const env={DB:new GoogleTestDB(),GOOGLE_OAUTH_CLIENT_ID:'test.apps.googleusercontent.com',GOOGLE_OAUTH_CLIENT_SECRET:'client-secret-FAKE',GOOGLE_OAUTH_TOKEN_KEY:Buffer.alloc(32,7).toString('base64url')};
++const call=(path,body,user='user-a',cookie='',extra={})=>googleConnection(new Request(base+path,{method:body?'POST':'GET',headers:{...(user?{'oai-authenticated-user-id':user}:{}),origin, ...(cookie?{cookie}:{}),...extra},...(body?{body:JSON.stringify(body)}:{})}),env);
++const checks=[];async function check(name,fn){await fn();checks.push(name);console.log('OK: '+name)}
++let calls=0;const realFetch=globalThis.fetch;
++globalThis.fetch=async()=>{calls++;throw Error('Unexpected network call')};
++await check('Exige identidad Sites y origen propio antes de contactar Google',async()=>{assert.equal((await call('/status',null,null)).status,401);assert.equal((await call('/start',{service:'gmail'},'user-a','',{origin:'https://other.invalid'})).status,403);assert.equal(calls,0)});
++await check('Sin cliente OAuth falla cerrado sin simular conexión',async()=>{const e={...env,GOOGLE_OAUTH_CLIENT_ID:null};const r=await googleConnection(new Request(base+'/start',{method:'POST',headers:{'oai-authenticated-user-id':'user-a',origin},body:'{"service":"gmail"}'}),e);assert.equal(r.status,503);const s=await (await googleConnection(new Request(base+'/status',{headers:{'oai-authenticated-user-id':'user-a'}}),e)).json();assert.equal(s.configured,false);assert.equal(calls,0)});
++let state,cookie;
++await check('Consentimiento con PKCE, estado aleatorio y cookie segura; sin secreto en navegador',async()=>{const r=await call('/start',{service:'gmail'}),b=await r.json(),u=new URL(b.url);state=u.searchParams.get('state');cookie=r.headers.get('set-cookie').split(';')[0];assert.equal(u.origin,'https://accounts.google.com');assert.equal(u.searchParams.get('code_challenge_method'),'S256');assert.equal(u.searchParams.get('access_type'),'offline');assert.match(u.searchParams.get('scope'),/gmail.readonly/);assert(!b.url.includes(env.GOOGLE_OAUTH_CLIENT_SECRET));assert.match(r.headers.get('set-cookie'),/Secure; HttpOnly; SameSite=Lax/);assert.equal(calls,0)});
++const callback=()=>'/callback?state='+state+'&code=fake-authorization-code';
++await check('Estado no sirve para otra identidad ni sin la cookie del navegador',async()=>{assert.equal((await call(callback(),null,'user-b',cookie)).status,403);assert.equal((await call(callback(),null,'user-a')).status,403);assert.equal(calls,0)});
++await check('Intercambio servidor y guardado cifrado, sin tokens en respuesta o estado',async()=>{
++ globalThis.fetch=async(url,options)=>{calls++;assert.equal(options.redirect,'error');if(url==='https://oauth2.googleapis.com/token'){const p=new URLSearchParams(options.body);assert.equal(p.get('client_secret'),env.GOOGLE_OAUTH_CLIENT_SECRET);assert(p.get('code_verifier'));return Response.json({access_token:'access-FAKE',refresh_token:'refresh-FAKE',token_type:'Bearer',expires_in:1,scope:'openid email https://www.googleapis.com/auth/gmail.readonly'})}assert.equal(url,'https://openidconnect.googleapis.com/v1/userinfo');return Response.json({sub:'google-account-a',email:'test@example.invalid',email_verified:true})};
++ const r=await call(callback(),null,'user-a',cookie);assert.equal(r.status,303);assert.equal(r.headers.get('location'),'/conexiones.html?google=connected&service=gmail');const s=await (await call('/status')).json();assert.equal(s.connections.gmail.connected,true);assert.equal(s.connections.calendar.connected,false);assert(!JSON.stringify(s).includes('access-FAKE'));const saved=env.DB.db.prepare("SELECT value FROM settings WHERE key LIKE 'google_connection:%'").get().value;assert(!saved.includes('refresh-FAKE'));assert(!saved.includes('access-FAKE'));assert(!saved.includes('test@example.invalid'));assert.equal((await call('/status',null,'user-b')).status,200);assert.equal((await (await call('/status',null,'user-b')).json()).connections.gmail.connected,false);
++});
++await check('La autorización consumida no vuelve a intercambiar tokens',async()=>{const before=calls;assert.equal((await call(callback(),null,'user-a',cookie)).status,403);assert.equal(calls,before)});
++await check('Renueva el token del servidor y lee solo el destino Gmail permitido',async()=>{
++ globalThis.fetch=async(url,options)=>{calls++;if(url==='https://oauth2.googleapis.com/token'){assert.equal(new URLSearchParams(options.body).get('grant_type'),'refresh_token');return Response.json({access_token:'renewed-FAKE',token_type:'Bearer',expires_in:3600})}assert.equal(url,'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5&labelIds=INBOX');assert.equal(options.headers.authorization,'Bearer renewed-FAKE');return Response.json({messages:[{id:'m1',threadId:'t1'}]})};const r=await call('/gmail');assert.equal(r.status,200);const b=await r.json();assert.deepEqual(b.messages,[{id:'m1',thread_id:'t1'}]);assert(!JSON.stringify(b).includes('renewed-FAKE'));
++});
++await check('No acepta identidad, destinos ni operaciones de envío desde el cliente',async()=>{const before=calls;assert.equal((await call('/start',{service:'gmail',user_id:'user-b'})).status,400);assert.equal((await call('/send',{service:'gmail'})).status,405);assert.equal((await call('/calendar',null,'user-b')).status,409);assert.equal(calls,before)});
++await check('La desconexión borra solo el token del usuario y servicio elegidos',async()=>{globalThis.fetch=async(url,options)=>{assert.equal(url,'https://oauth2.googleapis.com/revoke');assert.equal(new URLSearchParams(options.body).get('token'),'refresh-FAKE');return new Response('')};assert.equal((await call('/disconnect',{service:'gmail'})).status,200);assert.equal((await (await call('/status')).json()).connections.gmail.connected,false)});
++await check('Un permiso más amplio al solicitado no se guarda ni abre acceso',async()=>{const start=await call('/start',{service:'calendar'}),u=new URL((await start.json()).url),c=start.headers.get('set-cookie').split(';')[0];globalThis.fetch=async()=>Response.json({access_token:'bad-FAKE',refresh_token:'bad-refresh-FAKE',expires_in:3600,token_type:'Bearer',scope:'https://www.googleapis.com/auth/calendar'});const r=await call('/callback?state='+u.searchParams.get('state')+'&code=bad',null,'user-a',c);assert.equal(r.status,403);assert.equal((await (await call('/status')).json()).connections.calendar.connected,false)});
++globalThis.fetch=realFetch;env.DB.db.close();console.log(JSON.stringify({passed:checks.length,checks,scope:'SQL real local, Google simulado. Sin autorización real de Google ni acceso a datos privados.'}));
+diff --git a/web/conexiones.html b/web/conexiones.html
+new file mode 100644
+index 0000000..3420858
+--- /dev/null
++++ b/web/conexiones.html
+@@ -0,0 +1,6 @@
++<!doctype html>
++<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Conexiones Google · Fábrica de Agentes IA</title><link rel="stylesheet" href="/leo-crm.css"><script src="/google-connections.js" defer></script></head>
++<body><main><a href="/">← Fábrica de Agentes IA</a><h1>Correo y calendario</h1><p>Conectá tu propia cuenta con Google. La autorización es independiente de tu sesión de ChatGPT.</p><p id="google-status" role="status" aria-live="polite">Consultando conexión…</p>
++<section><h2>Correo · Gmail</h2><p id="gmail-status">Sin conexión comprobada.</p><p>Permite lectura. Esta primera integración muestra identificadores de mensajes; no envía correos ni comparte el contenido con la IA.</p><button id="connect-gmail" disabled>Conectar correo con Google</button><button id="read-gmail" disabled>Consultar bandeja</button><button id="disconnect-gmail" disabled>Desconectar correo</button><pre id="gmail-result"></pre></section>
++<section><h2>Google Calendar</h2><p id="calendar-status">Sin conexión comprobada.</p><p>Permite consultar los próximos cinco eventos. No crea citas ni manda invitaciones.</p><button id="connect-calendar" disabled>Conectar calendario con Google</button><button id="read-calendar" disabled>Consultar próximos eventos</button><button id="disconnect-calendar" disabled>Desconectar calendario</button><pre id="calendar-result"></pre></section>
++<p>Elegís la cuenta y aceptás sus permisos en Google. Podés desconectarla cuando quieras. La conexión utiliza renovación automática mientras el permiso siga vigente; una revocación o caducidad puede requerir nuevo consentimiento.</p><a href="/leo-crm.html">Abrir CRM de Leo</a></main></body></html>
+diff --git a/web/google-connections.js b/web/google-connections.js
+new file mode 100644
+index 0000000..b769c8c
+--- /dev/null
++++ b/web/google-connections.js
+@@ -0,0 +1,5 @@
++(()=>{'use strict';const $=id=>document.getElementById(id);let working=false;
++async function googleAPI(action,service){const write=['start','disconnect'].includes(action),r=await fetch('/api/integrations/google/'+action,{method:write?'POST':'GET',credentials:'same-origin',cache:'no-store',...(write?{headers:{'content-type':'application/json'},body:JSON.stringify({service})}:{})});const b=await r.json();if(!r.ok)throw Error(b.error||'La operación no fue confirmada.');return b;}
++async function refresh(){try{const b=await googleAPI('status');$('google-status').textContent=b.configured?'Elegí qué cuenta querés conectar.':'Falta configurar el cliente OAuth de Google de la Fábrica. Todavía no podés conectar una cuenta.';for(const s of ['gmail','calendar']){const c=b.connections[s];$(s+'-status').textContent=c.connected?'Conectado: '+c.account:c.requires_reconnect?'Necesita volver a conectarse.':'Sin cuenta conectada.';$('connect-'+s).disabled=!b.configured||working;$('read-'+s).disabled=!c.connected||working;$('disconnect-'+s).disabled=!c.connected||working;}}catch(e){$('google-status').textContent=e.message;}}
++for(const service of ['gmail','calendar'])for(const action of ['connect','read','disconnect'])$(action+'-'+service).onclick=async()=>{if(working)return;working=true;try{if(action==='connect'){const b=await googleAPI('start',service);const u=new URL(b.url);if(u.origin!=='https://accounts.google.com')throw Error('Destino de autorización no permitido.');window.location.assign(u.href);return;}if(action==='read')$(service+'-result').textContent=JSON.stringify(await googleAPI(service),null,2);else{const b=await googleAPI('disconnect',service);$(service+'-result').textContent=b.revocation_confirmed?'Cuenta desconectada y permiso revocado.':'Conexión eliminada de la Fábrica. Google no confirmó la revocación; revisá sus permisos en tu cuenta.';}}catch(e){$('google-status').textContent=e.message;}finally{working=false;await refresh();}};
++refresh();})();
+diff --git a/worker/google-connection.mjs b/worker/google-connection.mjs
+new file mode 100644
+index 0000000..4ae4dea
+--- /dev/null
++++ b/worker/google-connection.mjs
+@@ -0,0 +1,86 @@
++// Google is a connected data source; ChatGPT Sites remains the identity provider.
++const googleOrigin='https://agente-ricardo-revision-rick.glassybell1025.chatgpt.site';
++const googleBase='/api/integrations/google';
++const googleRedirect=googleOrigin+googleBase+'/callback';
++const googleScopes={gmail:'https://www.googleapis.com/auth/gmail.readonly',calendar:'https://www.googleapis.com/auth/calendar.events.readonly'};
++const googleJSON=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','referrer-policy':'no-referrer',...extra}});
++const googleError=(message,status=400)=>Object.assign(Error(message),{status});
++const googleB64=bytes=>btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
++const googleUnB64=text=>Uint8Array.from(atob(text.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
++const googleRandom=()=>googleB64(crypto.getRandomValues(new Uint8Array(32)));
++const googleHash=async text=>googleB64(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)));
++const googleRead=async(db,key)=>(await db.prepare('SELECT value FROM settings WHERE key=?').bind(key).first())?.value||null;
++const googlePut=(db,key,value)=>db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(key,value).run();
++const googleDelete=(db,key)=>db.prepare('DELETE FROM settings WHERE key=?').bind(key).run();
++function googleConfigured(env){return !!(env.GOOGLE_OAUTH_CLIENT_ID&&env.GOOGLE_OAUTH_CLIENT_SECRET&&env.GOOGLE_OAUTH_TOKEN_KEY);}
++async function googleCipher(env,user,service,value,decrypt=false){
++ let key;try{const bytes=googleUnB64(env.GOOGLE_OAUTH_TOKEN_KEY);if(bytes.length!==32)throw Error();key=await crypto.subtle.importKey('raw',bytes,'AES-GCM',false,['encrypt','decrypt']);}catch{throw googleError('La protección de la conexión no está configurada.',503);}
++ const aad=new TextEncoder().encode('factory-google-v1:'+user+':'+service);
++ if(decrypt){try{const box=JSON.parse(value);return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:googleUnB64(box.iv),additionalData:aad},key,googleUnB64(box.data))));}catch{throw googleError('No se pudo recuperar la conexión. Volvé a conectar Google.',409);}}
++ const iv=crypto.getRandomValues(new Uint8Array(12)),data=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:aad},key,new TextEncoder().encode(JSON.stringify(value)));
++ return JSON.stringify({v:1,iv:googleB64(iv),data:googleB64(data)});
++}
++async function googleFetch(url,options={}){
++ let response;try{response=await fetch(url,{...options,redirect:'error',signal:AbortSignal.timeout(15000)});}catch{throw googleError('Google no confirmó la conexión. Reintentá más tarde.',502);}
++ let body;try{body=await response.json();}catch{body={};}return {response,body};
++}
++function googleValidateToken(data,service,initial){
++ if(typeof data.access_token!=='string'||data.access_token.length>6000||!data.access_token||data.token_type?.toLowerCase()!=='bearer'||!Number.isFinite(data.expires_in)||data.expires_in<=0||data.expires_in>86400||(initial&&(!data.refresh_token||typeof data.refresh_token!=='string'||data.refresh_token.length>6000)))throw googleError('Google no entregó una conexión renovable válida. Volvé a dar consentimiento.',409);
++ const scopes=(data.scope||'').split(/\s+/),allowed=new Set([googleScopes[service],'openid','email','https://www.googleapis.com/auth/userinfo.email']);
++ if(initial&&!scopes.includes(googleScopes[service])||scopes.some(s=>s&&!allowed.has(s)))throw googleError('Los permisos de Google no coinciden con los solicitados.',403);
++}
++export async function googleConnection(request,env){
++ const url=new URL(request.url),user=request.headers.get('oai-authenticated-user-id');
++ if(!user)return googleJSON({error:'Iniciá sesión con ChatGPT para conectar tu cuenta.'},401);
++ if(!env.DB)return googleJSON({error:'Almacenamiento no disponible.'},503);
++ if(!['GET','POST'].includes(request.method))return googleJSON({error:'Método no permitido.'},405);
++ if(request.method==='POST'&&request.headers.get('origin')!==url.origin)return googleJSON({error:'Origen no permitido.'},403);
++ let action=url.pathname.slice(googleBase.length),service,body={};
++ const connectionKey=async s=>'google_connection:'+await googleHash(user)+':'+s;
++ try{
++  if(request.method==='POST'){const raw=await request.text();if(raw.length>1000)throw googleError('Solicitud demasiado grande.',413);try{body=JSON.parse(raw);}catch{throw googleError('Solicitud inválida.');}if(Object.keys(body).some(k=>k!=='service'))throw googleError('Campos no permitidos.');}
++  if(action==='/status'&&request.method==='GET'){
++   const connections={};for(const s of Object.keys(googleScopes)){const raw=await googleRead(env.DB,await connectionKey(s));if(!raw){connections[s]={connected:false};continue;}try{const c=await googleCipher(env,user,s,raw,true);connections[s]={connected:true,account:c.email,scope:googleScopes[s],connected_at:c.connected_at};}catch{connections[s]={connected:false,requires_reconnect:true};}}
++   return googleJSON({configured:googleConfigured(env),connections,scope:'Lectura autorizada; no envía correos ni modifica eventos. Los datos no se incorporan a Gemini.',setup_required:!googleConfigured(env)});
++  }
++  if(!googleConfigured(env))throw googleError('Falta configurar el cliente OAuth de Google de esta Fábrica. No hay una cuenta conectada.',503);
++  if(action==='/start'&&request.method==='POST'){
++   service=body.service;if(!Object.hasOwn(googleScopes,service))throw googleError('Elegí correo o calendario.');
++   const state=googleRandom(),nonce=googleRandom(),verifier=googleRandom(),now=Date.now();
++   await env.DB.prepare("DELETE FROM settings WHERE key LIKE 'google_oauth_state:%' AND json_extract(value,'$.expires_at')<?").bind(now).run();
++   const count=await env.DB.prepare("SELECT count(*) AS n FROM settings WHERE key LIKE 'google_oauth_state:%' AND json_extract(value,'$.user')=?").bind(user).first();if(count.n>=5)throw googleError('Ya hay conexiones en curso. Esperá diez minutos antes de reintentar.',429);
++   await googlePut(env.DB,'google_oauth_state:'+await googleHash(state),JSON.stringify({user,service,nonce_hash:await googleHash(nonce),verifier,expires_at:now+600000}));
++   const target=new URL('https://accounts.google.com/o/oauth2/v2/auth');target.search=new URLSearchParams({client_id:env.GOOGLE_OAUTH_CLIENT_ID,redirect_uri:googleRedirect,response_type:'code',scope:'openid email '+googleScopes[service],access_type:'offline',prompt:'consent',state,code_challenge:await googleHash(verifier),code_challenge_method:'S256'}).toString();
++   return googleJSON({url:target.href},200,{'set-cookie':'__Host-factory_google_state='+nonce+'; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=600'});
++  }
++  if(action==='/callback'&&request.method==='GET'){
++   const state=url.searchParams.get('state');if(!state||state.length>100)throw googleError('La autorización no contiene un estado válido.');
++   const stateKey='google_oauth_state:'+await googleHash(state),stored=await googleRead(env.DB,stateKey);let flow;try{flow=JSON.parse(stored);}catch{};
++   const nonce=request.headers.get('cookie')?.split(';').map(x=>x.trim()).find(x=>x.startsWith('__Host-factory_google_state='))?.split('=')[1];
++   if(!flow||flow.user!==user||flow.expires_at<Date.now()||!nonce||await googleHash(nonce)!==flow.nonce_hash)throw googleError('La autorización venció o pertenece a otra sesión. Volvé a conectar Google.',403);
++   const consumed=await env.DB.prepare('DELETE FROM settings WHERE key=? AND value=? RETURNING value').bind(stateKey,stored).first();if(!consumed)throw googleError('Esta autorización ya se utilizó.',409);
++   if(url.searchParams.has('error'))throw googleError('La cuenta no fue conectada: el consentimiento no se completó.',403);
++   const code=url.searchParams.get('code');if(!code||code.length>6000)throw googleError('Google no entregó un código válido.');service=flow.service;
++   const exchanged=await googleFetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:env.GOOGLE_OAUTH_CLIENT_ID,client_secret:env.GOOGLE_OAUTH_CLIENT_SECRET,code,code_verifier:flow.verifier,grant_type:'authorization_code',redirect_uri:googleRedirect})});
++   if(!exchanged.response.ok)throw googleError('Google rechazó la autorización. Volvé a conectar la cuenta.',409);googleValidateToken(exchanged.body,service,true);
++   const info=await googleFetch('https://openidconnect.googleapis.com/v1/userinfo',{headers:{authorization:'Bearer '+exchanged.body.access_token}});if(!info.response.ok||typeof info.body.sub!=='string'||typeof info.body.email!=='string'||info.body.email_verified!==true)throw googleError('Google no confirmó la identidad de la cuenta.',403);
++   const token={access_token:exchanged.body.access_token,refresh_token:exchanged.body.refresh_token,expires_at:Date.now()+exchanged.body.expires_in*1000,email:info.body.email,sub:info.body.sub,connected_at:Date.now()};
++   await googlePut(env.DB,await connectionKey(service),await googleCipher(env,user,service,token));
++   return new Response(null,{status:303,headers:{location:'/conexiones.html?google=connected&service='+service,'cache-control':'no-store','referrer-policy':'no-referrer','set-cookie':'__Host-factory_google_state=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0'}});
++  }
++  service=request.method==='POST'?body.service:action==='/gmail'?'gmail':action==='/calendar'?'calendar':null;
++  if(!Object.hasOwn(googleScopes,service))throw googleError('Operación no permitida.',404);
++  if(!(action==='/disconnect'&&request.method==='POST')&&!(request.method==='GET'&&['/gmail','/calendar'].includes(action)))throw googleError('Operación no permitida.',405);
++  const key=await connectionKey(service),raw=await googleRead(env.DB,key);if(!raw)throw googleError('Conectá tu cuenta de Google primero.',409);let token=await googleCipher(env,user,service,raw,true);
++  if(action==='/disconnect'){
++   let revoked=false;try{const r=await fetch('https://oauth2.googleapis.com/revoke',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({token:token.refresh_token}),redirect:'error',signal:AbortSignal.timeout(15000)});revoked=r.ok;}catch{}await googleDelete(env.DB,key);return googleJSON({disconnected:true,revocation_confirmed:revoked});
++  }
++  if(token.expires_at<Date.now()+60000){
++   const renewed=await googleFetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:env.GOOGLE_OAUTH_CLIENT_ID,client_secret:env.GOOGLE_OAUTH_CLIENT_SECRET,refresh_token:token.refresh_token,grant_type:'refresh_token'})});
++   if(!renewed.response.ok){if(renewed.body.error==='invalid_grant')await googleDelete(env.DB,key);throw googleError('Google requiere volver a conectar la cuenta.',409);}googleValidateToken(renewed.body,service,false);token={...token,access_token:renewed.body.access_token,refresh_token:renewed.body.refresh_token||token.refresh_token,expires_at:Date.now()+renewed.body.expires_in*1000};await googlePut(env.DB,key,await googleCipher(env,user,service,token));
++  }
++  const target=service==='gmail'?'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5&labelIds=INBOX':'https://www.googleapis.com/calendar/v3/calendars/primary/events?'+new URLSearchParams({maxResults:'5',singleEvents:'true',orderBy:'startTime',timeMin:new Date().toISOString()});
++  const result=await googleFetch(target,{headers:{authorization:'Bearer '+token.access_token}});if(!result.response.ok)throw googleError('Google no confirmó la lectura. Revisá la cuenta y sus permisos.',result.response.status===401?409:502);
++  return googleJSON(service==='gmail'?{messages:(result.body.messages||[]).map(m=>({id:m.id,thread_id:m.threadId})),scope:'Identificadores de hasta cinco mensajes. Sin envío, lectura de cuerpos ni incorporación a Gemini.'}:{events:(result.body.items||[]).map(e=>({id:e.id,title:e.summary||'Sin título',start:e.start?.dateTime||e.start?.date,end:e.end?.dateTime||e.end?.date})),scope:'Hasta cinco eventos. Sin crear, modificar o invitar.'});
++ }catch(e){return googleJSON({error:e.status?e.message:'No se pudo completar la conexión con Google.'},e.status||500);}
++}
