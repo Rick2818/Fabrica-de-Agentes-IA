@@ -19,6 +19,13 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REPOSITORY_ID" = '1432658222'
           curl --fail --silent --show-error --proto '=https' --tlsv1.2 --max-time 30 --output runner.mjs "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/run-cloud-queue.mjs"
+      - name: Probar reintentos y seguridad del ejecutor
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp runner.mjs run-cloud-queue.mjs
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 --max-time 30 --output test-cloud-runner.mjs "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/test-cloud-runner.mjs"
+          node test-cloud-runner.mjs
       - name: Procesar pendientes existentes
         shell: bash
         env:
