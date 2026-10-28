@@ -1,0 +1,131 @@
+Source base a76bd28e6a71011c12246ed1e58a7c350ce727c2
+Site source c5afe1cf62805ded1380c9f42af444fd863dd2ad
+
+diff --git a/scripts/test-agent.mjs b/scripts/test-agent.mjs
+index 7f20060..948d237 100644
+--- a/scripts/test-agent.mjs
++++ b/scripts/test-agent.mjs
+@@ -231,5 +231,16 @@ await test('Un recibo no persistido falla HTTP sin repetir un resultado ya guard
+  assert.equal((await call()).status,500);assert.equal((await board(local)).jobs[0].status,'done');
+  local.db.prepare('UPDATE runner_lock SET expires=0').run();assert.equal((await (await call()).json()).run.status,'idle');assert.equal(calls,1);assert.equal((await board(local)).jobs[0].result,'Resultado único');
+ });
++await test('El recibo conserva diagnóstico HTTP seguro y no convierte 403 en fallo de Governance',async()=>{
++ const local=new D1();local.db.exec(migration);await enqueue(local,{id:'github-diagnostic-test',kind:'task',title:'Lectura',text:'[TOOLS:read-only]\nConsultar repositorio público.'},now);
++ let reads=0;globalThis.fetch=async url=>{
++  if(String(url).includes('api.github.com')){reads++;return new Response('not saved private response',{status:403,headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset':'1793159999','x-github-request-id':'ABC:123','set-cookie':'secret'}});}
++  return Response.json({candidates:[{content:{role:'model',parts:[{functionCall:{name:'github_repository',args:{owner:'openai',repo:'openai-agents-js'}}}]}}]});
++ };
++ assert.equal((await runNext(local,env,now)).reason,'tools_saved');
++ globalThis.fetch=async(url,options)=>{const receipt=JSON.parse(options.body).contents.at(-1).parts[0].functionResponse.response;assert.equal(receipt.error_details.classification,'primary_rate_limit');assert.equal(receipt.error_details.request_id,'ABC:123');assert(!JSON.stringify(receipt).includes('secret'));return answer('Cuota primaria agotada, según recibo.');};
++ assert.equal((await runNext(local,env,now+14000)).status,'done');
++ const receipt=JSON.parse((await board(local)).jobs[0].evidence).tool_receipts[0];assert.equal(receipt.error_details.upstream_status,403);assert.equal(receipt.error_details.rate_limit_reset_at,1793159999000);assert.equal(reads,1);
++});
+ globalThis.fetch=originalFetch;
+ console.log(JSON.stringify({passed:checks.length,scope:'Local SQL real; Gemini simulado para fallos, cancelación y recuperación.',checks}));
+diff --git a/scripts/test-leo-public-tools.mjs b/scripts/test-leo-public-tools.mjs
+index 1c9e3bf..efafe5f 100644
+--- a/scripts/test-leo-public-tools.mjs
++++ b/scripts/test-leo-public-tools.mjs
+@@ -12,5 +12,14 @@ for(const url of ['http://127.0.0.1/private','http://169.254.169.254/latest/meta
+ }
+ await assert.rejects(()=>leoPublicTool('github_repository',{owner:'..',repo:'secret'},fake));
+ assert.equal(calls.length,2,'Blocked requests must never fetch');
++for(const [status,headers,classification] of [[403,{},'http_error'],[403,{'x-ratelimit-remaining':'0','x-ratelimit-reset':'1793159999','x-github-request-id':'ABC:123'},'primary_rate_limit'],[429,{'retry-after':'30'},'rate_limited']]){
++ let error;try{await leoPublicTool('github_repository',{owner:'openai',repo:'openai-agents-js'},async()=>new Response('sensitive upstream body',{status,headers}));}catch(e){error=e;}
++ assert.equal(error.status,502);assert.equal(error.public_diagnostics.upstream_status,status);assert.equal(error.public_diagnostics.classification,classification);
++ assert(!JSON.stringify(error.public_diagnostics).includes('sensitive'));
++ if(classification==='primary_rate_limit'){assert.equal(error.public_diagnostics.rate_limit_reset_at,1793159999000);assert.equal(error.public_diagnostics.request_id,'ABC:123');}
++ if(classification==='http_error')assert.match(error.message,/causa no determinada/);
++ if(status===429)assert.equal(error.public_diagnostics.retry_after_seconds,30);
++}
++await assert.rejects(()=>leoPublicTool('github_repository',{owner:'openai',repo:'openai-agents-js'},async()=>new Response('',{status:403,headers:{'x-github-request-id':'unsafe secret','x-ratelimit-remaining':'invalid','set-cookie':'secret'}})),e=>e.public_diagnostics.request_id===null&&e.public_diagnostics.rate_limit_remaining===null&&!JSON.stringify(e.public_diagnostics).includes('secret'));
+ console.log('PASS Leo public read-only navigation and GitHub connector mock; no real network was used');
+ 
+diff --git a/worker/leo-public-tools.mjs b/worker/leo-public-tools.mjs
+index 38e5832..213d908 100644
+--- a/worker/leo-public-tools.mjs
++++ b/worker/leo-public-tools.mjs
+@@ -17,7 +17,18 @@ export async function leoPublicTool(kind,input,fetcher=fetch){
+   url='https://api.github.com/repos/'+encodeURIComponent(owner)+'/'+encodeURIComponent(repo);
+  }else bad('Herramienta no autorizada');
+  const response=await fetcher(url,{method:'GET',redirect:'manual',headers:{'Accept':kind==='github_repository'?'application/vnd.github+json':'text/html','User-Agent':'FabricaDeAgentes-Leo-readonly'},signal:AbortSignal.timeout(8000)});
+- if(!response.ok)bad('La fuente externa devolvió HTTP '+response.status,502);
++ if(!response.ok){
++  // Preserve only allowlisted, non-secret response metadata. A 403 alone is
++  // not evidence of a missing token or a Sites Governance restriction.
++  const integerHeader=name=>{const v=response.headers.get(name);return v!=null&&/^\d{1,12}$/.test(v)?Number(v):null;};
++  const remaining=integerHeader('x-ratelimit-remaining');
++  const reset=integerHeader('x-ratelimit-reset');
++  const retry=integerHeader('retry-after');
++  const requestId=response.headers.get('x-github-request-id');
++  const diagnostics={upstream_status:response.status,origin:new URL(url).origin,classification:kind==='github_repository'&&[403,429].includes(response.status)&&remaining===0?'primary_rate_limit':response.status===429?'rate_limited':'http_error',rate_limit_remaining:remaining,rate_limit_reset_at:reset==null?null:reset*1000,retry_after_seconds:retry,request_id:requestId&&/^[A-Za-z0-9:-]{1,120}$/.test(requestId)?requestId:null};
++  const error=Object.assign(new Error('La fuente externa devolvió HTTP '+response.status+'; '+(diagnostics.classification==='primary_rate_limit'?'cuota primaria de GitHub agotada.':'causa no determinada.')),{status:502,public_diagnostics:diagnostics});
++  throw error;
++ }
+  if(response.status>=300&&response.status<400)bad('No se siguen redirecciones externas',502);
+  const type=response.headers.get('content-type')||'';
+  if(kind==='public_page'&&!type.includes('text/html'))bad('La fuente no devolvió HTML',502);
+diff --git a/worker/runtime.mjs b/worker/runtime.mjs
+index ccba83e..19a2360 100644
+--- a/worker/runtime.mjs
++++ b/worker/runtime.mjs
+@@ -218,13 +218,13 @@ export async function runNext(db,env,now=Date.now()){
+     let receipt=await trainingGet(db,receiptKey);
+     if(receipt&&(receipt.operation!==call.name||JSON.stringify(receipt.arguments)!==JSON.stringify(call.args||{})))throw Error('El reintento cambió la llamada de herramienta; se conserva el recibo anterior.');
+     if(!receipt){
+-     let output,error;try{
++     let output,error,error_details;try{
+       if(call.name==='read_public_page')output=await readPublicPage(call.args?.url);
+       else if(call.name==='github_repository')output=await leoPublicTool('github_repository',call.args);
+       else if(call.name==='sales_qualify')output=await specialistTool('sales_qualify',call.args);
+       else throw Error('Herramienta no autorizada');
+-     }catch(e){error=e.message||'Herramienta no disponible';}
+-     receipt={id:job.id+'-tool-'+i,job_id:job.id,operation:call.name,arguments:call.args||{},...(error?{error}:{output}),at:Date.now(),source:'model_function_call',external_writes:false};
++     }catch(e){error=e.message||'Herramienta no disponible';error_details=e.public_diagnostics;}
++     receipt={id:job.id+'-tool-'+i,job_id:job.id,operation:call.name,arguments:call.args||{},...(error?{error,...(error_details?{error_details}:{})}:{output}),at:Date.now(),source:'model_function_call',external_writes:false};
+      receipt.sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(receipt))))).map(b=>b.toString(16).padStart(2,'0')).join('');
+      await stmt(db,"INSERT INTO settings(key,value) SELECT ?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running' AND lease_token=?) ON CONFLICT(key) DO NOTHING",receiptKey,JSON.stringify(receipt),job.id,token).run();
+     }
+@@ -687,5 +687,5 @@ export default {async fetch(request,env,ctx){
+   const asset=url.pathname==='/'?'index.html':url.pathname.slice(1);
+   if(!Object.hasOwn(assets,asset))return new Response('No encontrado',{status:404});
+   return new Response(assets[asset],{headers:{'content-type':asset.endsWith('.css')?'text/css':asset.endsWith('.js')?'text/javascript':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'same-origin','content-security-policy':"default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; media-src 'self' blob: data:; worker-src 'self' blob:; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://huggingface.co https://*.huggingface.co https://*.hf.co; base-uri 'none'; object-src 'none'"}});
+- }catch(e){return json({error:e.status?e.message:'No pude completar la operación. Tus datos guardados se conservan.'},e.status||500);}
++ }catch(e){return json({error:e.status?e.message:'No pude completar la operación. Tus datos guardados se conservan.',...(e.public_diagnostics?{diagnostics:e.public_diagnostics}:{})},e.status||500);}
+ }};
+{
+  "project": "Fábrica de Agentes IA",
+  "site_project_id": "appgprj_6adbf0c05a0c8191b2ca585b76f5e862",
+  "base_source": "a76bd28e6a71011c12246ed1e58a7c350ce727c2",
+  "observed_version": 48,
+  "facts": [
+    "Historical receipt g-leo-native-functions-20261026-v1-step-0-r0-tool-1 records GitHub HTTP 403 only.",
+    "No recent Worker error events returned by Sites logs. This does not exclude historical errors.",
+    "Public GitHub adapter already sends User-Agent; it intentionally uses no credentials."
+  ],
+  "correction": "The generated report attributes a cause without evidence. A 403 alone does not prove a missing token, denied scope, or Sites Governance restriction.",
+  "implemented": [
+    "Allowlisted numeric rate-limit headers and safe GitHub request ID preserved in errors.",
+    "Only HTTP 403/429 plus x-ratelimit-remaining=0 is classified as primary quota exhaustion.",
+    "Unknown 403 stays cause undetermined. No automatic retry, token, destination or permission change.",
+    "Diagnostic metadata persists in hashed model tool receipts and authenticated API errors; upstream response bodies and cookies are excluded."
+  ],
+  "tests": {
+    "agent_tests": 113,
+    "public_tools": "passed: success, blocked destinations, unclassified 403, quota 403, 429, malformed headers, no secrets",
+    "cloud_runner": 10,
+    "crm_adapter": "6 groups passed",
+    "build": "passed",
+    "artifact": "valid ESM"
+  },
+  "verification_limit": "All new error-path tests use simulated HTTP; no real 403 reproduction. Automated review rejected creating a new persistent test task under retained no-new-task constraint; no task was created. Direct Site API test returned application 401.",
+  "reference": "https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api",
+  "changes_exclude": [
+    "voices",
+    "CRM behavior",
+    "model/provider",
+    "permissions",
+    "audience",
+    "other projects"
+  ]
+}
