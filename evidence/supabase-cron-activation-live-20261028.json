@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-28",
+  "site_version": 52,
+  "principal": {
+    "id": "supabase:udispwzwrebjkanudcoy:fabrica-queue",
+    "schedule": "Supabase Cron · cada minuto · America/El_Salvador · respeta cuota y reintentos",
+    "enabled": true,
+    "verified_at": 1793215057320
+  },
+  "sql_cron": {
+    "jobid": 1,
+    "name": "fabrica-queue",
+    "schedule": "* * * * *",
+    "active": true,
+    "automatic_starts": [
+      "2026-10-28T19:18:00.132050Z",
+      "2026-10-28T19:19:00.029244Z",
+      "2026-10-28T19:20:00.067675Z"
+    ],
+    "http_requests": 1
+  },
+  "verified_site_receipt": {
+    "started_at": 1793215080814,
+    "completed_at": 1793215082117,
+    "source": "supabase-cron",
+    "status": "quota",
+    "job_id": null,
+    "pending": 1,
+    "next_at": 1793257260000,
+    "supabase": {
+      "provider": "supabase-cron",
+      "project_id": "udispwzwrebjkanudcoy",
+      "schedule_id": "supabase:udispwzwrebjkanudcoy:fabrica-queue",
+      "event": "schedule",
+      "run_id": "97d77278-26db-4069-ad2c-059b2fe6402e",
+      "scheduled_at": 1793215080180
+    }
+  },
+  "primary": {
+    "schedule_id": "supabase:udispwzwrebjkanudcoy:fabrica-queue",
+    "last_cycle": {
+      "id": "e7976cc6-4c8f-43cb-bdb9-bb57a7a6c659",
+      "cycle_id": "97d77278-26db-4069-ad2c-059b2fe6402e",
+      "schedule_id": "supabase:udispwzwrebjkanudcoy:fabrica-queue",
+      "source": "supabase-cron",
+      "status": "quota",
+      "job_id": null,
+      "started_at": 1793215080875,
+      "completed_at": 1793215081838
+    },
+    "recent": true
+  },
+  "replay_test": {
+    "kind": "manual HTTP replay of original automatic context",
+    "http_status": 200,
+    "original_request": 1,
+    "replay_request": 2,
+    "same_run_id": true,
+    "same_completed_at": true,
+    "new_cycle_created": false
+  },
+  "quota": {
+    "used": 20,
+    "limit": 20,
+    "next_at": 1793257260000,
+    "local_resume": "2026-10-29 01:01 America/El_Salvador",
+    "new_gemini_calls": 0
+  },
+  "github": {
+    "workflow_schedule_removed": true,
+    "manual_dispatch_retained": true,
+    "commit": "60c804c08f767a77c62c51833d2e5fed5a9ee170"
+  },
+  "backup": {
+    "id": "6adbf94d28e8819189c0516c6068457a",
+    "prompt_updated": true
+  },
+  "auditor": {
+    "id": "6ae238f8b8a081918479f796f34da2b1",
+    "prompt_updated": true
+  },
+  "scope": "Automatic scheduler activation, correlation, quota backoff and replay verified. No generated task delivered by Supabase yet. SQL succeeded is not proof of a completed AI task. Continued long-term cadence is not guaranteed."
+}
