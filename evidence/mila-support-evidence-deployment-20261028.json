@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-28",
+  "project_id": "appgprj_6adbf0c05a0c8191b2ca585b76f5e862",
+  "source_commit": "d83a74261648ae4779362d0d674543161f53108a",
+  "version": 52,
+  "deployment": {
+    "id": "appgdep_6ae24996cfe88191aec5e5efb0e6b69b",
+    "project_id": "appgprj_6adbf0c05a0c8191b2ca585b76f5e862",
+    "title": "Fábrica de Agentes IA",
+    "version_id": "appgprj_6adbf0c05a0c8191b2ca585b76f5e862~appgver_d1e5c5f901388191b98f9cebbc539cfe",
+    "type": "publish",
+    "status": "succeeded",
+    "url": "https://agente-ricardo-revision-rick.glassybell1025.chatgpt.site",
+    "has_mcp": true,
+    "screenshot_asset_pointer": null,
+    "provider_deployment_id": "site---6adbf0c05a0c8191b2ca585b76f5e862",
+    "failure_message": null,
+    "env_set_revision": 6,
+    "updated_at": "2026-10-28T19:14:38.082617+00:00"
+  },
+  "diagnosis": [
+    "Isolated task excluded saved correction note by design.",
+    "Output validation accepted structurally valid JSON without checking support-action claim."
+  ],
+  "fix": [
+    "Evidence rule appended to all execution modes.",
+    "Bounded unsupported-support-action validator before persistence and objective progression.",
+    "Explicit rejection reason, existing retry and quota limits preserved."
+  ],
+  "tests": {
+    "agent": 121,
+    "runner": 10,
+    "built_worker_original_rejected": true,
+    "built_worker_correction_accepted": true,
+    "gemini": "simulated",
+    "live_gemini_retest": "not_performed_due_to_free_daily_limit",
+    "live_jobs_created": 0
+  },
+  "limitations": [
+    "Pattern-based safeguard does not prove general truthfulness.",
+    "Original historical result is preserved; approved correction is linked through saved note.",
+    "No E2E certification of all agent capabilities.",
+    "Pre-existing staged Supabase scheduler source retained without activation or configuration change."
+  ],
+  "code_patch": "evidence/mila-support-evidence-20261028.patch"
+}
