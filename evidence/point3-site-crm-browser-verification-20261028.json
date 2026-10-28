@@ -1,0 +1,41 @@
+{
+  "project": "Fábrica de Agentes IA",
+  "site": "https://agente-ricardo-revision-rick.glassybell1025.chatgpt.site/leo-crm.html",
+  "observed_site_version": 49,
+  "verification_source": "Live cloud browser UI; no mocked HTTP for these CRM actions",
+  "checks": [
+    {
+      "action": "Open existing Site CRM",
+      "observed": "Conectado · Fábrica de Agentes IA · Leo"
+    },
+    {
+      "action": "Create explicitly synthetic request without email, client data or charges",
+      "observed": "Solicitud guardada. Pedido #3 · Borrador",
+      "amount": 0,
+      "currency": "USD"
+    },
+    {
+      "action": "Reload page",
+      "observed": "Order #3 and synthetic opportunity persist"
+    },
+    {
+      "action": "Search order number 3",
+      "observed": "#3 · Borrador · QA técnico · Punto 3 · 27 octubre · USD 0.00"
+    }
+  ],
+  "synthetic_record": {
+    "order_number": 3,
+    "title": "PRUEBA SIN VALOR COMERCIAL · Flujo del Site",
+    "retained_for_audit": true,
+    "real_sale": false,
+    "charged": false,
+    "sent_email": false
+  },
+  "remaining": {
+    "gmail": "Not connected to Site; no hosted invocation or visitor consent verified",
+    "calendar": "Not connected to Site; no hosted invocation or visitor consent verified",
+    "blocker": "sites_list_plugin_eligibility is unavailable in the tool registry. Sites integration instructions require eligible canonical plugin/connector IDs before declaration. No IDs guessed, no permissions expanded, no token copied from ChatGPT."
+  },
+  "scope_limit": "CRM draft capture and retrieval verified; not complete agent autonomy or all of point 3.",
+  "governance": "No new Governance test; user requested leaving it as-is."
+}
