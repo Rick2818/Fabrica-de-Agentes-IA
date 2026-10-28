@@ -1,0 +1,84 @@
+{
+  "project": "Fábrica de Agentes IA",
+  "scope": "Point 4: cloud executor and recovery",
+  "primary": {
+    "run_id": "40600684270",
+    "job_id": 122590293602,
+    "attempt": 2,
+    "conclusion": "success",
+    "url": "https://github.com/Rick2818/Fabrica-de-Agentes-IA/actions/runs/40600684270/attempts/2",
+    "trigger_of_this_check": "Explicit manual rerun of existing job. Original event field remains schedule; this is NOT evidence of a new automatic schedule firing.",
+    "site_receipt": {
+      "started_at": 1793153610849,
+      "completed_at": 1793153611709,
+      "source": "github-actions",
+      "status": "idle",
+      "job_id": null,
+      "pending": 0,
+      "next_at": null,
+      "github": {
+        "provider": "github-actions",
+        "repository_id": "1432658222",
+        "repository": "Rick2818/Fabrica-de-Agentes-IA",
+        "run_id": "40600684270",
+        "run_attempt": "2",
+        "event": "schedule",
+        "commit_sha": "a24f1dbb658cbfb1dad15eb014b0ac13c06635eb"
+      }
+    }
+  },
+  "recovery": {
+    "primary_prior_cycle": {
+      "id": "0b6bc482-fd91-432e-b4fa-f09bae9d9b99",
+      "cycle_id": "40600684270-1",
+      "schedule_id": "github:1432658222",
+      "source": "github-actions",
+      "status": "waiting",
+      "job_id": "g-goal-leo-governance-audit-20261027-v1-step-1-r0",
+      "started_at": 1793142843506,
+      "completed_at": 1793142844861
+    },
+    "backup_completion": {
+      "id": "d2d1d84d-3be7-4e19-a827-4e85fc2c34ec",
+      "cycle_id": "9e00ee19-e3fc-8320-a3ce-1ba358c0d760",
+      "schedule_id": "6adbf94d28e8819189c0516c6068457a",
+      "source": "scheduled",
+      "status": "done",
+      "job_id": "g-goal-leo-governance-audit-20261027-v1-verify-2-r0",
+      "started_at": 1793152492311,
+      "completed_at": 1793152502124
+    },
+    "final_queue_pending": 0,
+    "job": "g-goal-leo-governance-audit-20261027-v1-step-1-r0",
+    "verified": "Existing waiting step resumed and verification completed by backup; stored result retained. No new task created."
+  },
+  "schedule": {
+    "configuration_verified": "13,28,35,43,58 * * * *",
+    "display_corrected": {
+      "id": "github:1432658222",
+      "schedule": "GitHub Actions · minutos 13, 28, 35, 43 y 58 de cada hora · America/El_Salvador · sujeto a demoras",
+      "enabled": true,
+      "verified_at": 1793153627030
+    },
+    "backup_preserved": "6adbf94d28e8819189c0516c6068457a"
+  },
+  "usage_before": {
+    "used": 20,
+    "limit": 20
+  },
+  "usage_after": {
+    "used": 20,
+    "limit": 20
+  },
+  "prior_test_baseline": {
+    "agent": 113,
+    "runner": 10,
+    "scope": "Previously passed local tests, including pause, cancellation, receipt correlation, lost receipt without regenerating saved output; not rerun or misrepresented as new live tests."
+  },
+  "limits": [
+    "Observed multi-hour gaps in GitHub automatic receipts; cadence 24/7 not certified.",
+    "Rerunning manually confirms connectivity and worker execution, not scheduler punctuality.",
+    "No new tasks, messages, external actions, model/provider change, billing or another scheduler."
+  ],
+  "reference": "https://docs.github.com/en/actions/how-tos/troubleshoot-workflows"
+}
