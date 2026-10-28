@@ -1,0 +1,54 @@
+{
+  "project": "Fábrica de Agentes IA",
+  "site_project_id": "appgprj_6adbf0c05a0c8191b2ca585b76f5e862",
+  "supabase_project_id": "udispwzwrebjkanudcoy",
+  "verified": {
+    "project_status": "ACTIVE_HEALTHY",
+    "organization_plan": "free",
+    "pg_cron": {
+      "available": "1.6.4",
+      "installed": false
+    },
+    "pg_net": {
+      "available": "0.20.4",
+      "installed": false
+    },
+    "vault": {
+      "installed": "0.3.1"
+    },
+    "existing_runner_key": "Present in Sites, secret value not readable",
+    "existing_cron": false
+  },
+  "decision": "Candidate: move the trigger to existing Supabase Postgres Cron; retain a single worker and durable queue in Sites. Do not create another agent or move CRM data.",
+  "status": "Prepared; not activated. No extensions enabled, cron created, secrets transferred, or existing schedule paused.",
+  "rollout": [
+    "Implement a provider-specific Sites runner credential, separate from AGENT_RUNNER_SECRET, preserving GitHub access during preparation.",
+    "Validate context provider=supabase-cron, exact project, cycle ID, schedule ID and automatic/manual distinction; never forge GitHub run context.",
+    "Use existing Sites queue, global pause, lease, cancellation, quotas and persisted receipts. Add Supabase cycle source to continuity monitoring.",
+    "Store only necessary service credentials in Vault; never put them in cron.job command text, public schema, repository or browser.",
+    "Enable pg_cron/pg_net only in this project after reviewing extension privileges and advisors. No new project, plan upgrade or paid service.",
+    "Stage the new job inactive. Test authentication and rejection locally, then a bounded real empty-queue call.",
+    "Switch ownership explicitly: pause GitHub trigger, register Supabase as primary, enable one bounded Cron job. Keep existing ChatGPT backup; do not let both principals execute concurrently.",
+    "Observe three actual automatic cycles with matching cron.job_run_details and Sites receipts, including a future-due task only if separately authorized; manual tests do not prove cadence.",
+    "Rollback: disable Supabase job and restore GitHub owner/metadata. Preserve receipts and queue."
+  ],
+  "security_limit": "Activation needs a separate restricted credential for Supabase. Existing Sites runner secret is masked; do not attempt to export GitHub secrets, reuse CRM credentials, rotate existing key or copy an owner token as a shortcut.",
+  "acceptance": [
+    "No new billable resources or billing changes.",
+    "Only the Fábrica project changes; no Boltech or other project.",
+    "Pausing globally stops every entry path.",
+    "Malformed/replayed/foreign-project contexts rejected or idempotently reconciled.",
+    "Automatic and manual evidence separate; primary/backup freshness independent.",
+    "Deferred work waits for due dates; quota and busy do not create retry storms."
+  ],
+  "references": [
+    "https://supabase.com/docs/guides/cron",
+    "https://supabase.com/docs/guides/functions/schedule-functions",
+    "https://supabase.com/docs/guides/database/extensions/pg_net",
+    "https://supabase.com/changelog?types=breaking-change"
+  ],
+  "limitations": [
+    "Supabase free project can pause under its plan conditions; zero-cost infrastructure is not a guaranteed 24/7 SLA.",
+    "Actual recurring execution is not certified until automatic receipts exist."
+  ]
+}
