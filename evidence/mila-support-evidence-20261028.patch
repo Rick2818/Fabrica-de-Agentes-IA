@@ -1,0 +1,139 @@
+diff --git a/scripts/test-agent.mjs b/scripts/test-agent.mjs
+index 49cc3e0..cc7eeb2 100644
+--- a/scripts/test-agent.mjs
++++ b/scripts/test-agent.mjs
+@@ -6,6 +6,7 @@ import {join} from 'node:path';
+ import worker,{enqueue,board,runNext,quotaDay,nextQuotaReset,createObjective,controlObjective,runRecordedCycle,recordSchedulerCheck,acknowledgeNotifications,continuity,startTrainingPractice,trainingPractice,evaluateTraining,recordOpportunity,commercialBoard} from '../worker/runtime.mjs';
+ import {SPECIALTY_SKILLS,SPECIALTY_TOOLKITS} from '../worker/specialty-skills.mjs';
+ import {specialistTool} from '../worker/specialist-tools.mjs';
++import {assertSupportEvidence} from '../worker/runtime.mjs';
+ class D1 {
+  constructor(file=':memory:'){this.db=new DatabaseSync(file);}
+  prepare(sql){const owner=this;return {args:[],bind(...args){this.args=args;return this;},async all(){return {results:owner.db.prepare(sql).all(...this.args)};},async first(){return owner.db.prepare(sql).get(...this.args)||null;},async run(){const r=owner.db.prepare(sql).run(...this.args);return {meta:{changes:Number(r.changes)}};}};}
+@@ -294,5 +295,22 @@ await test('Cron Supabase: contexto propio, ejecución única, recibos y rechazo
+  await local.prepare("UPDATE settings SET value=? WHERE key='automation'").bind(JSON.stringify({enabled:false,id:schedule})).run();
+  const paused=await (await call({...context,run_id:crypto.randomUUID(),scheduled_at:Date.now()})).json();assert.equal(paused.run.status,'paused');assert.equal(calls,1);
+ });
++await test('Mila: rechaza la afirmación original, incluso dentro de un borrador y con negaciones ajenas',async()=>{
++ for(const reply of ['El equipo técnico ya se encuentra analizando el caso con máxima prioridad para solucionar la incidencia.',"Borrador: 'El equipo técnico ya está trabajando. No hay SLA.'",'El equipo técnico ya está trabajando sin plazo confirmado.','He escalado la solicitud.','Our support team is already investigating.'])assert.throws(()=>assertSupportEvidence(reply),{code:'unsupported_support_action'});
++ for(const reply of ['Es necesaria una revisión técnica para identificar la causa. Todavía no hay un plazo confirmado.','No hay evidencia de que el equipo técnico ya está trabajando.','El equipo técnico no está trabajando.','Si el equipo técnico ya está trabajando, se debe verificar el recibo.','Presupuesto 500, real 540, diferencia 40.'])assert.doesNotThrow(()=>assertSupportEvidence(reply));
++});
++await test('Mila: el modo aislado bloquea el falso completado sin guardar notas, mensajes ni encargos derivados',async()=>{
++ const local=new D1();local.db.exec(migration);await enqueue(local,{id:'mila-evidence-isolated',kind:'task',title:'Mila',text:'12 usuarios sin acceso; no inventar acciones.'},now);
++ let sent;globalThis.fetch=async(_,request)=>{sent=JSON.parse(request.body);return answer('El equipo técnico ya se encuentra analizando el caso con máxima prioridad para solucionar la incidencia.',[{title:'No guardar',content:'Falso'}]);};
++ assert.equal((await runNext(local,env,now)).status,'error');let b=await board(local);assert.equal(b.jobs[0].status,'waiting');assert.equal(b.jobs[0].result,'');assert.equal(b.jobs[0].evidence,'');assert.match(b.jobs[0].error,/sin recibo verificable/);assert.equal(b.notes.length,0);assert.equal(b.messages.length,0);assert.equal(b.notifications.length,0);assert.match(sent.systemInstruction.parts[0].text,/Acciones y soporte/);
++ const corrected='Es necesaria una revisión técnica para identificar la causa. Todavía no hay un plazo de solución confirmado.';globalThis.fetch=async()=>answer(corrected);
++ assert.equal((await runNext(local,env,b.jobs[0].next_attempt_at+1)).status,'done');b=await board(local);assert.equal(b.jobs.length,1);assert.equal(b.jobs[0].result,corrected);assert.equal(JSON.parse(b.jobs[0].evidence).http,200);local.db.close();
++});
++await test('Mila: chat contextual no guarda el borrador incorrecto en historial',async()=>{
++ const local=new D1();local.db.exec(migration);await enqueue(local,{id:'mila-evidence-chat',kind:'chat',text:'Prepará un borrador de soporte'},now);let instruction;globalThis.fetch=async(_,request)=>{instruction=JSON.parse(request.body).systemInstruction.parts[0].text;return answer('Hemos notificado al equipo técnico.');};await runNext(local,env,now);const b=await board(local);assert.equal(b.jobs[0].status,'waiting');assert.equal(b.messages.filter(m=>m.role==='model').length,0);assert.match(instruction,/Acciones y soporte/);local.db.close();
++});
++await test('Mila: objetivo no avanza de fase con una acción inventada',async()=>{
++ const local=new D1();local.db.exec(migration);await createObjective(local,goalInput('mila-evidence-goal'),now);globalThis.fetch=async()=>structured(plan);await runNext(local,env,now);let instruction;globalThis.fetch=async(_,request)=>{instruction=JSON.parse(request.body).systemInstruction.parts[0].text;return answer('El equipo técnico está revisando el caso.');};await runNext(local,env,now+14000);const b=await board(local);assert.equal(b.objectives[0].status,'working');assert.equal(b.jobs.find(j=>j.phase==='step').status,'waiting');assert.equal(b.jobs.filter(j=>j.phase==='verify').length,0);assert.match(instruction,/Acciones y soporte/);local.db.close();
++});
+ globalThis.fetch=originalFetch;
+ console.log(JSON.stringify({passed:checks.length,scope:'Local SQL real; Gemini simulado para fallos, cancelación y recuperación.',checks}));
+diff --git a/worker/runtime.mjs b/worker/runtime.mjs
+index 27c64c2..dde7389 100644
+--- a/worker/runtime.mjs
++++ b/worker/runtime.mjs
+@@ -39,6 +39,21 @@ function validateOutput(o){
+  if(o.notes.some(n=>!text(n.title,120)||!text(n.content,4000))||o.tasks.some(t=>!text(t.title,160)||!text(t.prompt,12000)))throw Error('Gemini devolvió datos inválidos.');
+  return o;
+ }
++// This check covers operational claims in support replies, including quoted drafts.
++// It is deliberately bounded; it is not a general fact checker.
++export const SUPPORT_EVIDENCE_RULE='Acciones y soporte: diferenciá hechos comprobados, recomendaciones y borradores. No afirmés que un equipo técnico ya analiza, trabaja, revisa o atiende un incidente, ni que registraste, escalaste o enviaste una solicitud: esta cola de texto no ejecuta esas acciones. Tampoco dentro de un borrador. Sin un recibo de esa acción, usá «es necesaria una revisión técnica» o «se recomienda solicitarla», sin inventar plazos. Una nota o un resultado anterior de IA no acredita la acción externa.';
++export function assertSupportEvidence(reply){
++ const normalized=reply.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
++ const sentences=normalized.split(/[.!?;\n]+/);
++ for(const sentence of sentences){
++  // Negated or explicitly hypothetical statements do not assert execution.
++  if(/^\s*[«"'>]*(?:no (?:hay (?:evidencia|confirmacion)|esta confirmado|se ha confirmado|es cierto)|sin (?:evidencia|confirmacion)|si\b|cuando\b|se recomienda\b|es necesari[oa]\b|there is no (?:evidence|confirmation)|it is not confirmed)/.test(sentence))continue;
++  const team=/\b(?:el|nuestro) equipo (?:tecnico|de soporte)\s+(?:ya\s+)?(?:se (?:encuentra|halla)\s+|esta\s+|sigue\s+|continua\s+)?(?:analizando|trabajando|revisando|atendiendo|investigando|analiza|trabaja|revisa|atiende|investiga|ha (?:iniciado|comenzado|recibido))\b/.test(sentence);
++  const firstPerson=/\b(?:he|hemos) (?:enviado|escalado|notificado|contactado)\b|\b(?:envie|enviamos|escale|escalamos|notifique|notificamos|contacte|contactamos)\b/.test(sentence);
++  const english=/\b(?:the|our) (?:technical|support) team (?:is (?:already )?(?:working|investigating|reviewing|analyzing)|has (?:already )?(?:started|received))\b|\b(?:i have|we have|i've|we've) (?:sent|escalated|notified|contacted)\b/.test(sentence);
++  if(team||firstPerson||english)throw Object.assign(Error('La respuesta atribuye una acción de soporte sin recibo verificable. Debe reformularse como recomendación, sin afirmar ejecución ni plazos.'),{code:'unsupported_support_action'});
++ }
++}
+ export async function enqueue(db,input,now=Date.now()){
+  if(!validId(input.id)||!['task','chat'].includes(input.kind)||!text(input.text,12000))throw Object.assign(Error('Revisá el mensaje de la tarea.'),{status:400});
+  if(input.use_saved_context!=null&&typeof input.use_saved_context!=='boolean')throw Object.assign(Error('La opción de memoria es inválida.'),{status:400});
+@@ -194,6 +209,8 @@ export async function runNext(db,env,now=Date.now()){
+   if(selectingTools)instruction+=' Si no necesitás una función, devolvé JSON {reply,notes:[],tasks:[]}.';
+   if(toolEnabled)instruction=instruction.replace(objectiveSystem,objectiveSystem.replace('Tus herramientas en esta versión son generación de texto, memoria y cola persistente. NO tenés navegador, correo, acceso a otras aplicaciones, pagos ni ejecución de software.',AGENT_TOOL_INSTRUCTION));
+   if(toolState){contents=[...contents,toolState.model_content,{role:'user',parts:toolState.responses}];}
++  // Append after selecting the mode: isolated jobs must not depend on saved notes.
++  instruction+='\n'+SUPPORT_EVIDENCE_RULE;
+   // Use the already verified direct Google endpoint; never forward the key to the browser.
+   const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent',{
+    method:'POST',headers:{'content-type':'application/json','x-goog-api-key':env.GOOGLE_GENERATIVE_AI_API_KEY},
+@@ -242,6 +259,7 @@ export async function runNext(db,env,now=Date.now()){
+   const raw=data.candidates?.[0]?.content?.parts?.filter(p=>!p.thought).map(p=>p.text||'').join('');
+   const parsed=JSON.parse((raw||'null').replace(/^```(?:json)?\s*|\s*```$/g,''));
+   const output=objective?objectiveOutput(job,parsed):validateOutput(parsed);
++  assertSupportEvidence(output.reply);
+   if(job.kind==='task'&&output.tasks.length)throw Error('La tarea devolvió otros encargos en lugar de un resultado.');
+   const completed=Date.now();
+   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(output.reply)))).map(b=>b.toString(16).padStart(2,'0')).join('');
+@@ -256,7 +274,7 @@ export async function runNext(db,env,now=Date.now()){
+   const result=await db.batch(changes);
+   return {status:result.at(-1)?.meta?.changes?'done':'cancelled',id:job.id,...(objective?{objective_id:objective.id,phase:job.phase}:{})};
+  }catch(e){
+-  if(job){const message=e.name==='TimeoutError'?'Gemini tardó demasiado. Se reintentará sin duplicar el resultado.':e instanceof SyntaxError?'Gemini devolvió un formato incompleto. Se reintentará.':'No se pudo completar el resultado. Se reintentará si quedan intentos.';await failJob(db,job,token,message,job.attempts<2?60000:null,Date.now());if(objective&&job.attempts>=2)await blockObjective(db,objective,message,Date.now());}
++  if(job){const message=e.code==='unsupported_support_action'?e.message:e.name==='TimeoutError'?'Gemini tardó demasiado. Se reintentará sin duplicar el resultado.':e instanceof SyntaxError?'Gemini devolvió un formato incompleto. Se reintentará.':'No se pudo completar el resultado. Se reintentará si quedan intentos.';await failJob(db,job,token,message,job.attempts<2?60000:null,Date.now());if(objective&&job.attempts>=2)await blockObjective(db,objective,message,Date.now());}
+   return {status:'error',id:job?.id||null};
+  }finally{await stmt(db,'UPDATE runner_lock SET expires=? WHERE id=1 AND token=?',lockUntil,token).run();}
+ }
+diff --git a/docs/mila-support-evidence-20261028.md b/docs/mila-support-evidence-20261028.md
+new file mode 100644
+index 0000000..505e2bd
+--- /dev/null
++++ b/docs/mila-support-evidence-20261028.md
+@@ -0,0 +1,46 @@
++# Mila: afirmaciones de soporte sin evidencia
++
++## Diagnóstico
++
++El trabajo `synthetic-six-20261028-mila` se ejecutó en modo `isolated`.
++Las notas guardadas no se incorporan a ese modo por diseño, para evitar
++mezclar datos. Su instrucción solo decía no inventar comprobaciones.
++El validador verificaba JSON, longitud y campos, pero no esta afirmación:
++«El equipo técnico ya se encuentra analizando el caso con máxima prioridad
++para solucionar la incidencia». Un HTTP 200 prueba generación, no atención
++de un incidente por terceros.
++
++## Corrección
++
++- Regla de evidencia añadida al final de la instrucción de todos los modos:
++  tareas aisladas, conversación, objetivos y herramientas de solo lectura.
++- Control determinista previo a toda persistencia de resultados. Rechaza
++  afirmaciones cubiertas de equipo técnico trabajando o contacto/escalamiento
++  ejecutados, incluso si aparecen dentro de un borrador. No puede ampliarse
++  el permiso mediante notas, texto del encargo o resultados anteriores.
++- El fallo conserva el mismo trabajo y registra el motivo concreto. Mantiene
++  los límites existentes de reintentos y cuota; no guarda respuesta, notas,
++  tareas derivadas ni avance del objetivo como si fuera una entrega válida.
++- No se reescribe el resultado histórico: la corrección aprobada permanece
++  vinculada al ID original mediante la nota en la memoria de la Fábrica.
++
++Texto corregido: «Es necesaria una revisión técnica para identificar la
++causa. Todavía no hay un plazo de solución confirmado».
++
++## Verificación y límites
++
++121 comprobaciones del servidor y 10 del ejecutor pasan con SQL local real
++y HTTP de Gemini simulado. Se reproducen la frase original y variantes ES/EN,
++se comprueba la ausencia de falso completado, la recuperación del mismo ID
++con texto corregido y la aplicación en chat y objetivos. Se construyó y validó
++el Worker empaquetado. No se consumió Gemini ni se crearon tareas productivas.
++
++Este control cubre patrones concretos, no toda paráfrasis ni la veracidad
++general de un texto. No certifica el comportamiento completo de Mila o las
++seis especialidades. Una prueba nueva con Gemini productivo continúa limitada
++por la cuota gratuita; los resultados simulados no se presentan como tales
++pruebas. No hay nuevos canales, gastos, permisos ni acciones de contacto.
++
++La fuente recuperada ya contenía el soporte de cron Supabase preparado en
++`bbdd6512328d21925b900aa12f583820b1e445de`. Se conserva ese avance; esta
++corrección no activa cron ni cambia el principal o la programación.
