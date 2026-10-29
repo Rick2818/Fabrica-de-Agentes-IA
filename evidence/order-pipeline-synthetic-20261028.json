@@ -1,0 +1,18 @@
+{
+  "at": "2026-10-29T00:15:49.257Z",
+  "passed": 9,
+  "scope": "Integrated local pipeline with real SQLite persistence and synthetic provisioner, quality evaluator, access and mail adapters. No deployed bridge, real agent creation, OAuth consent, email delivery, sale, charge or production change.",
+  "management_number": "TEST-20261028-0001",
+  "synthetic_emails": 1,
+  "checks": [
+    "Signed order received with the same management number",
+    "Retry persists one order; changed content rejected",
+    "Invalid signatures, expired envelopes and secrets in payload rejected",
+    "Customer cannot retrieve another customer or merchant order",
+    "Configuration and quality checks persist before uncertain delivery",
+    "Restart and retry recover one agent and one synthetic email",
+    "Customer recovers status by original management number without factory internals",
+    "A failed quality check blocks delivery",
+    "No delivery when provisioner expands permissions"
+  ]
+}

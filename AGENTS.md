@@ -27,3 +27,8 @@ La etapa actual define y practica las habilidades del agente de ventas como espe
 Los agentes deben representarse como mascotitas con cuerpo y personalidad, con silueta reconocible, extremidades y gestos. No usar esferas, círculos ni bolas como cuerpo del agente. La referencia tipo Dots es funcional y de compañía; crear diseños propios sin copiar personajes o recursos de terceros. Conservar la identidad negra y dorada elegida por Rick. Aplicar esta regla a futuras variantes y especialidades.
 
 Nombres de las mascotas por especialidad: Leo (Ventas), Mila (Servicio al cliente), Vera (Finanzas), Alma (Química y farmacia), Nico (Logística) y Lía (Mercadeo). Son identidades de la Fábrica; no reasignar nombres personalizados ni alterar recibos históricos.
+
+
+## Puente autorizado expresamente — 28-10-2026
+
+Ricardo definió Boltech como cara comercial y la Fábrica como producción interna privada. Se autoriza preparar en pruebas un puente específico de pedidos y entregas con número de gestión común. Esta excepción no permite fusionar repositorios, bases, ejecutores, agentes, campañas ni credenciales; tampoco cambia pagos o producción. La cuenta de Gmail/Calendar del cliente se conecta por su propio consentimiento al agente entregado. Ver docs/PRIVATE-ORDER-BRIDGE.md. No sustituir certificación de autonomía por una simulación del pedido.
