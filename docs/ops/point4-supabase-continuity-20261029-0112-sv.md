@@ -1,0 +1,31 @@
+# Fábrica de Agentes IA · Punto 4 — reanudación real Supabase Cron · 2026-10-29 01:12 SV
+
+## Alcance y protección
+Auditoría de solo lectura sobre Supabase `udispwzwrebjkanudcoy`, GitHub `Rick2818/Fabrica-de-Agentes-IA` y complemento operativo del Site `appgprj_6adbf0c05a0c8191b2ca585b76f5e862`. No se invocó `private.fabrica_scheduler_tick()` ni `run_pending_tasks`, ni se creó un disparador, trabajo o ejecutor. No se alteró cuota, `not_before`, datos, Site, fuente, credenciales o trabajos ajenos. La fuente actual del editor de Sites no está disponible para inspección directa: la lectura del complemento no acredita paridad de código con GitHub.
+
+## Cambio funcional importante — evidencia de entregas programadas auténticas
+A las **2026-10-29 07:11:46 UTC (01:11:46 SV)**, `cron.job_run_details` acumulaba **714 ejecuciones SQL `succeeded`**, sin fallos SQL; esto por sí solo no certifica entrega. `cron.job` muestra un único job activo `jobid=1`, nombre `fabrica-queue`, expresión `* * * * *`, comando `select private.fabrica_scheduler_tick();`.
+
+`private.fabrica_scheduler_receipts` muestra **6 ciclos**, **3 `verified=true, site_status=done` conciliados**, **1 `verified=true, site_status=error`**, **1 `quota` verificado** y **1 pendiente de conciliación**. Cada `cycle_id` y `request_id` es único. El ciclo pendiente ya tenía respuesta en `net._http_response` y un recibo del Site `done`, pero no se contabiliza como `done` *verificado por Supabase* hasta su conciliación automática.
+
+| Hora SV | UUID del ciclo | Trabajo Site | Evidencia al corte |
+|---|---|---|---|
+| 01:01 | `0e31db4b-47e9-461d-8468-668356804821` | `g-goal-paridad-dots-fabrica-seis-20261028-v1-step-1-r0` | `verified=true`, `site_status=error`, HTTP 200; no es `done`. La nota operativa del respaldo identifica timeout Gemini. |
+| 01:08 | `fd712df0-85c8-46f5-8be6-d108667fa6e7` | mismo trabajo anterior | `verified=true`, `site_status=done`, HTTP 200. Reintento automático, trabajo `done` con `attempts=2` y recibo Gemini. |
+| 01:09 | `d2328dfe-5c50-4b0d-9857-abf2601b8a76` | `ac4596e9-4ca9-48cf-8316-f99186ee2b97` — práctica Ventas | `verified=true`, `site_status=done`, HTTP 200, `attempts=1`. |
+| 01:10 | `dfa71c70-8063-4dc4-8429-766ce8e2c305` | `afd420ce-0e2e-45a5-8d35-156a7671f35f` — práctica Servicio | `verified=true`, `site_status=done`, HTTP 200, `attempts=1`. |
+| 01:11 | `ad5ed449-3984-4d6d-96d8-2a02b6060228` | `beba39da-17e6-4702-b2df-04d483455b00` — práctica Finanzas | Site informa `done` con UUID coincidente, pero `checked_at=null` al corte: **pendiente de conciliación**. |
+
+En `net._http_response`, para los ciclos nuevos con respuesta se contrastaron `receipt.source=supabase-cron`, `receipt.supabase.run_id=cycle_id`, `receipt.job_id`, `run.status`, el UUID y el estado guardado. El estado MCP `health.autonomy.cycles` registra los mismos UUID, trabajos y resultados. El primer `quota` verificado es `97d77278-26db-4069-ad2c-059b2fe6402e` del 28 de octubre; se respetó el reinicio natural de cuota el 29 de octubre a la 01:01 SV.
+
+## Integridad, continuidad y limitaciones
+- La cola original se preservó. En la lectura de Site, tras tres entregas verificadas había cinco trabajos `queued`, 53 `done`, dos `failed` y tres `cancelled` en el historial de 63; la cuota era 4/20 y no se adelantaron fechas. El conteo cambia naturalmente a medida que el cron avanza.
+- Se verificó una **recuperación real tras error de modelo**: el mismo trabajo falló en 01:01 y se completó en 01:08 tras el diferimiento natural de cinco minutos, sin dos entregas `done` para ese trabajo. Es evidencia concreta de reintento, no prueba exhaustiva de todos los escenarios de fallo.
+- Las seis prácticas históricas `synthetic-six-20261028-{leo,mila,alma,nico,vera,lia}` constan `done`, pero sus orígenes son `mcp` o `scheduled-mcp`, no `supabase-cron`. **No se atribuyen al cron principal**.
+- `private.fabrica_scheduler_tick()` implementa `pg_try_advisory_xact_lock(1432658222,51)`, `FOR UPDATE`, control `enabled`, `not_before`, recibo pendiente y envío correlacionado. `private.fabrica_scheduler_reconcile()` valida identidad, UUID, tiempos, estado, trabajo y respuesta; maneja HTTP/red, recibo ausente y diferimiento. Las PK/índices únicos protegen `cycle_id` y `request_id`. `pg_locks` tenía 0 advisory locks concedidos en el instante observado, sin que ello demuestre exclusión mutua en carrera.
+- Observabilidad: el ciclo `site_status=error` verificado tiene `error_code=null`; la función registra `worker_error` en `last_error` temporalmente, pero lo limpia tras recuperación. Se deja documentado como brecha de diagnóstico histórico, sin cambiar SQL productivo mientras la cola se recupera.
+- Se consultaron logs Supabase del 29 de octubre 06:55–07:12 UTC; 38 eventos `postgres_logs` en la ventana, sin evidencia adicional de errores de base. Los logs no sustituyen los recibos.
+- `AGENTS.md` leído; se revisaron los seis workflows vigentes de GitHub: `agent-runner.yml`, `diagnostic-a-scheduler.yml`, `diagnostic-b-conditions.yml`, `diagnostic-c-actor.yml`, `training-regression.yml`, `verify-training.yml`. **Ninguno contiene `on.schedule`**; hay disparos manuales y `push` de pruebas. Se inspeccionaron `scripts/test-cloud-runner.mjs` y `scripts/test-agent.mjs`, que contienen pruebas simuladas de reintentos, cuota, concurrencia, lease e idempotencia, pero **no se ejecutaron en esta auditoría**. El respaldo horario conserva su responsabilidad sin competir.
+
+## Resultado y certificación
+**Avance real: ejecución autónoma programada confirmada para tres entregas `done` con recibos Supabase conciliados; cuarto `done` visto en Site y pendiente de conciliación al corte.** Se confirmó recuperación de un timeout con reintento posterior. **Punto 4 aún no certificado integralmente**: falta inspección directa de la fuente publicada del editor Sites y pruebas productivas controladas de exclusión mutua, pausas, fallo HTTP/recibo ausente y continuidad por las seis especialidades desde el cron principal. No se hicieron pruebas destructivas ni nuevas pruebas que consuman cuota. Próxima observación: conciliación automática del cuarto recibo y progreso natural de los trabajos pendientes, sin tick manual ni segundo programador.
