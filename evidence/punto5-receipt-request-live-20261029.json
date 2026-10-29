@@ -1,0 +1,32 @@
+{
+  "checked_at": "2026-10-29T17:38:28.170Z",
+  "scope": "Prueba de solicitud de recibos por cliente sintético en ficha QA del Site original; no es circuito de fabricación",
+  "order": {
+    "number": 4,
+    "id": "406e7392-69a2-4107-8cba-2ad938ff3c7f",
+    "status": "draft",
+    "registration_notes": 1,
+    "other_events": 0
+  },
+  "request": {
+    "job_id": "bfb07b8a-2b52-4341-b61d-4a0b8e87fc2e",
+    "title": "Práctica: QA P5 · Recibos pedido #4",
+    "status": "done",
+    "attempts": 2,
+    "initial_error": "HTTP503",
+    "result": "Estimado cliente: Se toma nota de su conformidad textual para el pedido #4 (UUID 406e7392-69a2-4107-8cba-2ad938ff3c7f). Conforme a la información disponible y a las capacidades del entorno, informo el estado de las evidencias solicitadas: 1. Recibo de aprobación: No existe en los registros. El estado del pedido se mantiene en borrador (draft) y no se ha registrado ningún evento de aprobación. 2. Recibo de fabricación: No existe ni es posible verificarlo, dado que el pedido no está aprobado y no hay un agente creado ni asignado. Este entorno de texto no cuenta con integración activa al CRM ni a sistemas de fabricación o emisor de recibos operativos. Estado comercial: Borrador (draft). Siguiente acción sugerida: Es necesaria una revisión técnica y comercial para solicitar la aprobación formal del pedido antes de proceder a la fase de fabricación.",
+    "generation_receipt": {
+      "provider": "Google",
+      "model": "gemini-3.6-flash",
+      "http": 200,
+      "completed_at": 1793295430703,
+      "sha256": "9786a682a10f40d14babb452961cfb5e2f045fc86a48a9117a54f50785e5b98d",
+      "characters": 856,
+      "execution_source": "server",
+      "context_mode": "isolated"
+    }
+  },
+  "approval_receipt": null,
+  "fabrication_receipt": null,
+  "certified": false
+}
