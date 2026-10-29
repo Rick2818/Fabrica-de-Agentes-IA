@@ -17,7 +17,18 @@ export async function leoPublicTool(kind,input,fetcher=fetch){
   url='https://api.github.com/repos/'+encodeURIComponent(owner)+'/'+encodeURIComponent(repo);
  }else bad('Herramienta no autorizada');
  const response=await fetcher(url,{method:'GET',redirect:'manual',headers:{'Accept':kind==='github_repository'?'application/vnd.github+json':'text/html','User-Agent':'FabricaDeAgentes-Leo-readonly'},signal:AbortSignal.timeout(8000)});
- if(!response.ok)bad('La fuente externa devolvió HTTP '+response.status,502);
+ if(!response.ok){
+  // Preserve only allowlisted, non-secret response metadata. A 403 alone is
+  // not evidence of a missing token or a Sites Governance restriction.
+  const integerHeader=name=>{const v=response.headers.get(name);return v!=null&&/^\d{1,12}$/.test(v)?Number(v):null;};
+  const remaining=integerHeader('x-ratelimit-remaining');
+  const reset=integerHeader('x-ratelimit-reset');
+  const retry=integerHeader('retry-after');
+  const requestId=response.headers.get('x-github-request-id');
+  const diagnostics={upstream_status:response.status,origin:new URL(url).origin,classification:kind==='github_repository'&&[403,429].includes(response.status)&&remaining===0?'primary_rate_limit':response.status===429?'rate_limited':'http_error',rate_limit_remaining:remaining,rate_limit_reset_at:reset==null?null:reset*1000,retry_after_seconds:retry,request_id:requestId&&/^[A-Za-z0-9:-]{1,120}$/.test(requestId)?requestId:null};
+  const error=Object.assign(new Error('La fuente externa devolvió HTTP '+response.status+'; '+(diagnostics.classification==='primary_rate_limit'?'cuota primaria de GitHub agotada.':'causa no determinada.')),{status:502,public_diagnostics:diagnostics});
+  throw error;
+ }
  if(response.status>=300&&response.status<400)bad('No se siguen redirecciones externas',502);
  const type=response.headers.get('content-type')||'';
  if(kind==='public_page'&&!type.includes('text/html'))bad('La fuente no devolvió HTML',502);
