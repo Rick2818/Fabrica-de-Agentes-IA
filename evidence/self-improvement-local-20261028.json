@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-29T00:22:52.227Z",
+  "passed": 12,
+  "scope": "SQL local real, reinicio de base en disco y Google simulado. Mejora acotada sobre rúbricas textuales; no certifica RSI general, mejora semántica, autonomía continua ni ejecución del cron desplegado.",
+  "checks": [
+    "Rechaza una evaluación sin casos independientes",
+    "Evaluación fallida dispara una propuesta usando la cola existente",
+    "Reinicia desde disco, compara ambos casos y promueve una mejora estricta",
+    "El mismo fallo no genera ciclos duplicados ni llamadas adicionales",
+    "La versión nueva se vincula a prácticas sin alterar misión o herramientas",
+    "Otra ficha y una ficha modificada no heredan la guía",
+    "Rollback conserva el historial y restaura versión previa",
+    "Sin mejora medible se rechaza sin activar instrucciones",
+    "Deshabilitar invalida y cancela trabajo pendiente de mejora",
+    "Cuota agotada conserva ciclo pendiente sin llamar a Google",
+    "API exige operador autorizado y origen propio",
+    "Las respuestas de mejora no pueden escribir notas o encargos"
+  ]
+}
