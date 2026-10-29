@@ -142,3 +142,23 @@ Alta atómica de contacto, oportunidad, pedido y actividad; reintentos conservan
 El único trabajador sigue siendo la cola persistente y `/internal/runner` del Site, con GitHub como disparador principal existente y el respaldo ya configurado. No se añadió otro cron ni se ampliaron herramientas externas. Se separan recibos y frescura de principal/respaldo para impedir que el respaldo oculte retrasos del principal. Una tarea vencida por más de 90 minutos sigue visible aunque existan latidos recientes. La entrada de servicio respeta la pausa global también sin contexto GitHub. El cliente GitHub exige recibo correlacionado por todos los campos de ejecución, estado, trabajo y tiempos; estados desconocidos con cola vacía ya no se acreditan.
 
 112 pruebas SQL locales del agente, 10 pruebas del cliente GitHub y regresión del adaptador CRM aprobadas; prueba nueva de pérdida del recibo verifica HTTP fallido sin volver a generar un resultado ya guardado. Gemini está simulado en estas pruebas. La ejecución GitHub 40571060672 tiene pasos exitosos y recibo HTTP `idle` correlacionado con el Site, pero hay huecos de varias horas entre ejecuciones del principal. Esto impide certificar cadencia 24/7. No confundir éxito de una ejecución con cumplimiento del cron configurado. Punto 3, correo/calendario y acceso externo permanecen pendientes de validación independiente. Evidencia: `evidence/leo-executor-stage4-2026-10-27.json`.
+
+## Disparador Supabase — 28 octubre 2026
+
+Se integra el programador del proyecto existente `udispwzwrebjkanudcoy` con
+credencial exclusiva y procedencia `supabase-cron`. No se mueve la cola ni se
+crea otro agente. El principal se selecciona en el tablero del Site; GitHub
+no puede ejecutar pendientes cuando Supabase es el principal. La pausa global
+prevalece en ambos. Los contextos repetidos recuperan el recibo guardado, sin
+procesar otro trabajo. Los recibos HTTP/SQL deben coincidir por UUID de ciclo,
+proyecto, programación, fecha y estado. Configurar un cron no acredita su
+frecuencia: se requiere observar disparos automáticos y recibos reales.
+
+117 pruebas locales del agente y 10 del cliente GitHub aprobadas; los nuevos
+casos usan Gemini simulado. La activación y sus pruebas reales se conservan
+por separado en evidencia del despliegue. Correo/calendario continúan pendientes
+por OAuth de Google y las voces siguen fuera del alcance de este cambio.
+
+## Separación Fábrica / agentes — 29-10-2026
+
+Nuevo encargo: conservar capacidades, personajes y avances de los agentes; rediseñar solamente la planta y su coordinación. Diseño elíptico con seis estaciones en `web/index.html`; interfaz previa preservada en `web/agentes.html`. Motor de pedidos separado en `worker/factory.mjs`. Detalle y límites: `docs/factory/IMPLEMENTACION-20261029.md` y `CONTRATO-PEDIDO.md`. Pruebas locales no equivalen a certificación productiva. No activar el nuevo flujo hasta conectar provisionador, ejecutor, cabinas y entrega reales.

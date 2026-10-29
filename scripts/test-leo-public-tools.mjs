@@ -12,4 +12,14 @@ for(const url of ['http://127.0.0.1/private','http://169.254.169.254/latest/meta
 }
 await assert.rejects(()=>leoPublicTool('github_repository',{owner:'..',repo:'secret'},fake));
 assert.equal(calls.length,2,'Blocked requests must never fetch');
+for(const [status,headers,classification] of [[403,{},'http_error'],[403,{'x-ratelimit-remaining':'0','x-ratelimit-reset':'1793159999','x-github-request-id':'ABC:123'},'primary_rate_limit'],[429,{'retry-after':'30'},'rate_limited']]){
+ let error;try{await leoPublicTool('github_repository',{owner:'openai',repo:'openai-agents-js'},async()=>new Response('sensitive upstream body',{status,headers}));}catch(e){error=e;}
+ assert.equal(error.status,502);assert.equal(error.public_diagnostics.upstream_status,status);assert.equal(error.public_diagnostics.classification,classification);
+ assert(!JSON.stringify(error.public_diagnostics).includes('sensitive'));
+ if(classification==='primary_rate_limit'){assert.equal(error.public_diagnostics.rate_limit_reset_at,1793159999000);assert.equal(error.public_diagnostics.request_id,'ABC:123');}
+ if(classification==='http_error')assert.match(error.message,/causa no determinada/);
+ if(status===429)assert.equal(error.public_diagnostics.retry_after_seconds,30);
+}
+await assert.rejects(()=>leoPublicTool('github_repository',{owner:'openai',repo:'openai-agents-js'},async()=>new Response('',{status:403,headers:{'x-github-request-id':'unsafe secret','x-ratelimit-remaining':'invalid','set-cookie':'secret'}})),e=>e.public_diagnostics.request_id===null&&e.public_diagnostics.rate_limit_remaining===null&&!JSON.stringify(e.public_diagnostics).includes('secret'));
 console.log('PASS Leo public read-only navigation and GitHub connector mock; no real network was used');
+

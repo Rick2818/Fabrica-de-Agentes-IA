@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import worker,{enqueue,board,runNext,quotaDay,nextQuotaReset,createObjective,controlObjective,runRecordedCycle,recordSchedulerCheck,acknowledgeNotifications,continuity,startTrainingPractice,trainingPractice,evaluateTraining,recordOpportunity,commercialBoard} from '../worker/runtime.mjs';
 import {SPECIALTY_SKILLS,SPECIALTY_TOOLKITS} from '../worker/specialty-skills.mjs';
 import {specialistTool} from '../worker/specialist-tools.mjs';
+import {assertSupportEvidence} from '../worker/runtime.mjs';
 class D1 {
  constructor(file=':memory:'){this.db=new DatabaseSync(file);}
  prepare(sql){const owner=this;return {args:[],bind(...args){this.args=args;return this;},async all(){return {results:owner.db.prepare(sql).all(...this.args)};},async first(){return owner.db.prepare(sql).get(...this.args)||null;},async run(){const r=owner.db.prepare(sql).run(...this.args);return {meta:{changes:Number(r.changes)}};}};}
@@ -230,6 +231,92 @@ await test('Un recibo no persistido falla HTTP sin repetir un resultado ya guard
  const call=()=>worker.fetch(new Request('https://example.test/internal/runner',{method:'POST',headers:{'x-agent-runner-key':e.AGENT_RUNNER_SECRET}}),e);
  assert.equal((await call()).status,500);assert.equal((await board(local)).jobs[0].status,'done');
  local.db.prepare('UPDATE runner_lock SET expires=0').run();assert.equal((await (await call()).json()).run.status,'idle');assert.equal(calls,1);assert.equal((await board(local)).jobs[0].result,'Resultado único');
+});
+await test('El recibo conserva diagnóstico HTTP seguro y no convierte 403 en fallo de Governance',async()=>{
+ const local=new D1();local.db.exec(migration);await enqueue(local,{id:'github-diagnostic-test',kind:'task',title:'Lectura',text:'[TOOLS:read-only]\nConsultar repositorio público.'},now);
+ let reads=0;globalThis.fetch=async url=>{
+  if(String(url).includes('api.github.com')){reads++;return new Response('not saved private response',{status:403,headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset':'1793159999','x-github-request-id':'ABC:123','set-cookie':'secret'}});}
+  return Response.json({candidates:[{content:{role:'model',parts:[{functionCall:{name:'github_repository',args:{owner:'openai',repo:'openai-agents-js'}}}]}}]});
+ };
+ assert.equal((await runNext(local,env,now)).reason,'tools_saved');
+ globalThis.fetch=async(url,options)=>{const receipt=JSON.parse(options.body).contents.at(-1).parts[0].functionResponse.response;assert.equal(receipt.error_details.classification,'primary_rate_limit');assert.equal(receipt.error_details.request_id,'ABC:123');assert(!JSON.stringify(receipt).includes('secret'));return answer('Cuota primaria agotada, según recibo.');};
+ assert.equal((await runNext(local,env,now+14000)).status,'done');
+ const receipt=JSON.parse((await board(local)).jobs[0].evidence).tool_receipts[0];assert.equal(receipt.error_details.upstream_status,403);assert.equal(receipt.error_details.rate_limit_reset_at,1793159999000);assert.equal(reads,1);
+});
+await test('Reejecuciones antiguas no acreditan frescura del disparador automático',async()=>{
+ const local=new D1();local.db.exec(migration);
+ await local.prepare("INSERT INTO settings VALUES('automation',?)").bind(JSON.stringify({enabled:true,id:'github:1432658222'})).run();
+ const insert=(...args)=>local.prepare('INSERT INTO agent_cycles VALUES(?,?,?,?,?,?,?,?)').bind(...args).run();
+ await insert('old','111-1','github:1432658222','github-actions','idle',null,now-3*3600000,now-3*3600000+1);
+ await insert('rerun','111-2','github:1432658222','github-actions','idle',null,now-1000,now-1);
+ const h=await continuity(local,now);assert.equal(h.primary.recent,false);assert.equal(h.primary.last_cycle.id,'old');assert.equal(h.last_scheduled_cycle.id,'old');assert.equal(h.last_manual_cycle.id,'rerun');assert.notEqual(h.status,'recent');
+});
+await test('Dispatch manual y reejecución se distinguen de schedule original sin gastar IA',async()=>{
+ const local=new D1();local.db.exec(migration);await local.prepare("INSERT INTO settings VALUES('automation',?)").bind(JSON.stringify({enabled:true,id:'github:1432658222'})).run();
+ const key='test-runner-secret-with-at-least-32-characters',e={...env,DB:local,AGENT_RUNNER_SECRET:key};let calls=0;globalThis.fetch=async()=>{calls++;return answer()};
+ for(const [event,attempt] of [['workflow_dispatch','1'],['schedule','2'],['schedule','1']]){
+  const context={provider:'github-actions',repository:'Rick2818/Fabrica-de-Agentes-IA',repository_id:'1432658222',run_id:'888',run_attempt:attempt,event,commit_sha:'a'.repeat(40)};
+  const response=await worker.fetch(new Request('https://example.test/internal/runner',{method:'POST',headers:{'x-agent-runner-key':key},body:JSON.stringify(context)}),e);
+  const body=await response.json();assert.equal(body.run.status,'idle');assert.equal(body.receipt.source,'github-actions');assert.equal(body.receipt.github.event,event);
+  const h=await continuity(local);if(event==='schedule'&&attempt==='1'){assert.equal(h.primary.recent,true);assert.equal(h.primary.last_cycle.source,'github-actions');}else{assert.equal(h.primary.recent,false);assert.equal(h.last_manual_cycle.source,'github-actions-manual');}
+ }
+ assert.equal(calls,0);
+});
+await test('Credencial Supabase aislada: acceso, pausa y contexto sin impersonar GitHub',async()=>{
+ const local=new D1();local.db.exec(migration);
+ const gh='github-existing-secret-with-32-characters',sb='supabase-separate-secret-with-32-characters';
+ const e={...env,DB:local,AGENT_RUNNER_SECRET:gh,SUPABASE_RUNNER_SECRET:sb};let calls=0;globalThis.fetch=async()=>{calls++;return answer()};
+ const call=(key,body='',extra={})=>worker.fetch(new Request('https://example.test/internal/runner',{method:'POST',headers:{'x-supabase-runner-key':key,...extra},body}),e);
+ assert.equal((await call(gh)).status,401);assert.equal((await call('wrong')).status,401);
+ assert.equal((await call(sb,'',{'x-agent-runner-key':gh})).status,400);
+ assert.equal((await call(sb,JSON.stringify({provider:'github-actions'}))).status,400);
+ await local.prepare("INSERT INTO settings VALUES('cloud_runner_receipt',?)").bind(JSON.stringify({source:'github-actions',marker:'preserved'})).run();
+ const ok=await (await call(sb)).json();assert.equal(ok.run.status,'idle');assert.equal(ok.receipt.source,'supabase-service');assert.equal(ok.receipt.github,undefined);
+ assert.equal(JSON.parse(local.db.prepare("SELECT value FROM settings WHERE key='cloud_runner_receipt'").get().value).marker,'preserved');
+ assert.equal(JSON.parse(local.db.prepare("SELECT value FROM settings WHERE key='supabase_service_receipt'").get().value).source,'supabase-service');
+ assert.equal((await continuity(local)).last_scheduled_cycle,null);
+ await local.prepare("INSERT INTO settings VALUES('automation',?)").bind(JSON.stringify({enabled:false})).run();
+ assert.equal((await (await call(sb)).json()).run.status,'paused');assert.equal(calls,0);
+});
+await test('Cron Supabase: contexto propio, ejecución única, recibos y rechazo del principal anterior',async()=>{
+ const local=new D1();local.db.exec(migration);const schedule='supabase:udispwzwrebjkanudcoy:fabrica-queue';
+ await local.prepare("INSERT INTO settings VALUES('automation',?)").bind(JSON.stringify({enabled:true,id:schedule})).run();
+ const key='supabase-separate-secret-with-32-characters',gh='github-existing-secret-with-32-characters';const e={...env,DB:local,SUPABASE_RUNNER_SECRET:key,AGENT_RUNNER_SECRET:gh};
+ const context={provider:'supabase-cron',project_id:'udispwzwrebjkanudcoy',schedule_id:schedule,event:'schedule',run_id:crypto.randomUUID(),scheduled_at:Date.now()};
+ const call=c=>worker.fetch(new Request('https://example.test/internal/runner',{method:'POST',headers:{'x-supabase-runner-key':key},body:JSON.stringify(c)}),e);
+ let calls=0;globalThis.fetch=async()=>{calls++;return answer('Una sola entrega');};await enqueue(local,{id:'supabase-exact-once',kind:'task',title:'Texto',text:'Ejercicio sintético'},Date.now()-1000);
+ for(const c of [{...context,project_id:'another-project'},{...context,scheduled_at:Date.now()-600000},{...context,event:'manual'},{...context,provider:'github-actions'}])assert.equal((await call(c)).status,400);
+ const result=await (await call(context)).json();assert.equal(result.run.status,'done');assert.equal(result.receipt.source,'supabase-cron');assert.equal(result.receipt.supabase.run_id,context.run_id);
+ const replay=await (await call(context)).json();assert.deepEqual(replay,result);assert.equal(calls,1);assert.equal((await call({...context,scheduled_at:context.scheduled_at+1})).status,409);
+ const h=await continuity(local);assert.equal(h.primary.recent,true);assert.equal(h.primary.last_cycle.source,'supabase-cron');assert.equal(JSON.parse((await board(local)).jobs[0].evidence).execution_source,'supabase-cron');
+ await enqueue(local,{id:'do-not-run-old-primary',kind:'task',title:'Texto',text:'Conservar pendiente'},Date.now()-1000);
+ const old={provider:'github-actions',repository:'Rick2818/Fabrica-de-Agentes-IA',repository_id:'1432658222',run_id:'999',run_attempt:'1',event:'schedule',commit_sha:'a'.repeat(40)};
+ const oldResponse=await worker.fetch(new Request('https://example.test/internal/runner',{method:'POST',headers:{'x-agent-runner-key':gh},body:JSON.stringify(old)}),e);assert.equal((await oldResponse.json()).run.status,'paused');assert.equal(calls,1);
+ await local.prepare("UPDATE settings SET value=? WHERE key='automation'").bind(JSON.stringify({enabled:false,id:schedule})).run();
+ const paused=await (await call({...context,run_id:crypto.randomUUID(),scheduled_at:Date.now()})).json();assert.equal(paused.run.status,'paused');assert.equal(calls,1);
+});
+await test('Mila: rechaza la afirmación original, incluso dentro de un borrador y con negaciones ajenas',async()=>{
+ for(const reply of ['El equipo técnico ya se encuentra analizando el caso con máxima prioridad para solucionar la incidencia.',"Borrador: 'El equipo técnico ya está trabajando. No hay SLA.'",'El equipo técnico ya está trabajando sin plazo confirmado.','He escalado la solicitud.','Our support team is already investigating.'])assert.throws(()=>assertSupportEvidence(reply),{code:'unsupported_support_action'});
+ for(const reply of ['Es necesaria una revisión técnica para identificar la causa. Todavía no hay un plazo confirmado.','No hay evidencia de que el equipo técnico ya está trabajando.','El equipo técnico no está trabajando.','Si el equipo técnico ya está trabajando, se debe verificar el recibo.','Presupuesto 500, real 540, diferencia 40.'])assert.doesNotThrow(()=>assertSupportEvidence(reply));
+});
+await test('Mila: el modo aislado bloquea el falso completado sin guardar notas, mensajes ni encargos derivados',async()=>{
+ const local=new D1();local.db.exec(migration);await enqueue(local,{id:'mila-evidence-isolated',kind:'task',title:'Mila',text:'12 usuarios sin acceso; no inventar acciones.'},now);
+ let sent;globalThis.fetch=async(_,request)=>{sent=JSON.parse(request.body);return answer('El equipo técnico ya se encuentra analizando el caso con máxima prioridad para solucionar la incidencia.',[{title:'No guardar',content:'Falso'}]);};
+ assert.equal((await runNext(local,env,now)).status,'error');let b=await board(local);assert.equal(b.jobs[0].status,'waiting');assert.equal(b.jobs[0].result,'');assert.equal(b.jobs[0].evidence,'');assert.match(b.jobs[0].error,/sin recibo verificable/);assert.equal(b.notes.length,0);assert.equal(b.messages.length,0);assert.equal(b.notifications.length,0);assert.match(sent.systemInstruction.parts[0].text,/Acciones y soporte/);
+ const corrected='Es necesaria una revisión técnica para identificar la causa. Todavía no hay un plazo de solución confirmado.';globalThis.fetch=async()=>answer(corrected);
+ assert.equal((await runNext(local,env,b.jobs[0].next_attempt_at+1)).status,'done');b=await board(local);assert.equal(b.jobs.length,1);assert.equal(b.jobs[0].result,corrected);assert.equal(JSON.parse(b.jobs[0].evidence).http,200);local.db.close();
+});
+await test('Mila: chat contextual no guarda el borrador incorrecto en historial',async()=>{
+ const local=new D1();local.db.exec(migration);await enqueue(local,{id:'mila-evidence-chat',kind:'chat',text:'Prepará un borrador de soporte'},now);let instruction;globalThis.fetch=async(_,request)=>{instruction=JSON.parse(request.body).systemInstruction.parts[0].text;return answer('Hemos notificado al equipo técnico.');};await runNext(local,env,now);const b=await board(local);assert.equal(b.jobs[0].status,'waiting');assert.equal(b.messages.filter(m=>m.role==='model').length,0);assert.match(instruction,/Acciones y soporte/);local.db.close();
+});
+await test('Mila: objetivo no avanza de fase con una acción inventada',async()=>{
+ const local=new D1();local.db.exec(migration);await createObjective(local,goalInput('mila-evidence-goal'),now);globalThis.fetch=async()=>structured(plan);await runNext(local,env,now);let instruction;globalThis.fetch=async(_,request)=>{instruction=JSON.parse(request.body).systemInstruction.parts[0].text;return answer('El equipo técnico está revisando el caso.');};await runNext(local,env,now+14000);const b=await board(local);assert.equal(b.objectives[0].status,'working');assert.equal(b.jobs.find(j=>j.phase==='step').status,'waiting');assert.equal(b.jobs.filter(j=>j.phase==='verify').length,0);assert.match(instruction,/Acciones y soporte/);local.db.close();
+});
+await test('Supabase: una espera por cuota correlacionada no simula atasco ni actividad reciente',async()=>{
+ const local=new D1();local.db.exec(migration);const schedule='supabase:udispwzwrebjkanudcoy:fabrica-queue',cycle='quota-wait-cycle',at=now-2*3600000,until=now+3600000;
+ await enqueue(local,{id:'quota-deferred-new-job',kind:'task',title:'Pendiente',text:'Prueba'},at);local.db.prepare("INSERT INTO settings VALUES('automation',?)").run(JSON.stringify({id:schedule,enabled:true}));local.db.prepare("INSERT INTO agent_cycles(id,cycle_id,schedule_id,source,status,started_at,completed_at) VALUES(?,?,?,'supabase-cron','quota',?,?)").run(cycle,cycle,schedule,at,at+1);local.db.prepare("INSERT INTO settings VALUES('supabase_runner_receipt',?)").run(JSON.stringify({status:'quota',next_at:until,supabase:{run_id:cycle}}));local.db.prepare("INSERT INTO runner_lock(id,token,expires) VALUES(1,'quota-test',?)").run(until);
+ let h=await continuity(local,now);assert.equal(h.status,'waiting');assert.equal(h.stalled,false);assert.equal(h.primary.recent,false);assert.equal(h.deferred_until,until);
+ h=await continuity(local,until+1);assert.equal(h.stalled,true);assert.notEqual(h.status,'waiting');local.db.prepare("UPDATE settings SET value=? WHERE key='supabase_runner_receipt'").run(JSON.stringify({status:'quota',next_at:until,supabase:{run_id:'wrong-cycle'}}));assert.equal((await continuity(local,now)).stalled,true);local.db.close();
 });
 globalThis.fetch=originalFetch;
 console.log(JSON.stringify({passed:checks.length,scope:'Local SQL real; Gemini simulado para fallos, cancelación y recuperación.',checks}));
