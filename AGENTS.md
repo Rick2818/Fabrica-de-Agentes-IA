@@ -27,3 +27,7 @@ La etapa actual define y practica las habilidades del agente de ventas como espe
 Los agentes deben representarse como mascotitas con cuerpo y personalidad, con silueta reconocible, extremidades y gestos. No usar esferas, círculos ni bolas como cuerpo del agente. La referencia tipo Dots es funcional y de compañía; crear diseños propios sin copiar personajes o recursos de terceros. Conservar la identidad negra y dorada elegida por Rick. Aplicar esta regla a futuras variantes y especialidades.
 
 Nombres de las mascotas por especialidad: Leo (Ventas), Mila (Servicio al cliente), Vera (Finanzas), Alma (Química y farmacia), Nico (Logística) y Lía (Mercadeo). Son identidades de la Fábrica; no reasignar nombres personalizados ni alterar recibos históricos.
+
+## Instrucción vigente de Ricardo — 29-10-2026
+
+Dos diseños dentro del proyecto: planta de producción y agentes-producto. Conservar y reutilizar los avances de los agentes. Nuevo panel elíptico de seis estaciones: recepción, fabricación, certificación, ajustes, cabina y entrega. Las preguntas comerciales se resuelven fuera de la Fábrica; el pedido llega por trigger autenticado. La autorización actual permite ese contrato de intercambio; no permite modificar internamente el otro proyecto. Los seis pasos de producción no sustituyen los puntos históricos de certificación. Véase `docs/factory/IMPLEMENTACION-20261029.md` para gates pendientes. No activar el nuevo backend ni declarar producción por haber aprobado pruebas simuladas.
