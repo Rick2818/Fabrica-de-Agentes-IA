@@ -36,7 +36,7 @@ jobs:
           node scripts/test-expression.mjs
           node scripts/test-voice-routing.mjs
       - name: Factory frontend syntax
-        run: node --check web/factory.js
+        run: node --check web/app.js
       - name: Build original Worker and validate artifact
         run: |
           node scripts/build.mjs
