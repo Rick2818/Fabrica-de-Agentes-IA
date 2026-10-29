@@ -1,0 +1,32 @@
+# Fábrica de Agentes IA — Punto 4 — control 2026-10-29 17:16 SV
+
+## Dictamen rector
+**CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN.** No existe cliente real para aceptación final; no reabrir cierre administrativo por esa ausencia. Auditoría de solo lectura del Site vía complemento, Supabase y GitHub. Única escritura de esta pasada: el presente registro. No se invocó `run_pending_tasks`, `private.fabrica_scheduler_tick()` ni un flujo GitHub; no se crearon encargos, no se alteraron cuotas, fechas, locks, producción, ejecutores, versión de Site ni automatización de respaldo. No hubo contactos, correos, pagos ni acceso a otros proyectos.
+
+Referencias: Site `appgprj_6adbf0c05a0c8191b2ca585b76f5e862`, Supabase `udispwzwrebjkanudcoy`, repo `Rick2818/Fabrica-de-Agentes-IA`. Corte SQL: **2026-10-29 23:16:20 UTC (17:16:20 SV)**.
+
+## Cron principal y conciliación
+- `cron.job`: jobid=1, `fabrica-queue`, activo, `* * * * *`, comando `select private.fabrica_scheduler_tick();`. Configuración `private.fabrica_scheduler_config`: `enabled=true`, `not_before=null`, `last_error=null`.
+- `cron.job_run_details`: **1,679 ejecuciones, 1,679 SQL succeeded** (+58 respecto al corte 16:18 SV). No confundir con entregas.
+- `private.fabrica_scheduler_receipts`: **964 recibos**, **963 verificados**, uno del minuto actual todavía sin conciliación al corte; **0 no verificados con más de dos minutos**. En lectura inmediatamente anterior, 963 recibos con 963 UUID y 963 request_id distintos, estados 945 `idle`, 9 `done`, 4 `waiting`, 2 `error`, 1 `busy`, 1 `quota`, 1 reciente sin estado. El incremento posterior es un nuevo ciclo; no se atribuye a `done`. **9 `done` verificados históricos, 0 nuevas entregas funcionales observadas.**
+- Correlación concreta: `cycle_id=003d2d72-5fca-4612-bb9a-a350c73448bb`, `request_id=964`, `scheduled_at=2026-10-29T23:15:00.045Z`, respuesta `net._http_response` HTTP 200 con `receipt.supabase.run_id` igual, `source=supabase-cron`, `run.status=receipt.status=idle`. El Site también informa el mismo UUID y `idle`. No se atribuyó a entrega `done`, ni se forzó la reconciliación.
+- Índices únicos comprobados: `cycle_id` PK y `request_id` UNIQUE. Inspección estática de funciones `private.fabrica_scheduler_tick` y `private.fabrica_scheduler_reconcile`: referencias a `not_before` y `run_id`; el tick usa advisory lock y `FOR UPDATE`. Esto no constituye prueba dinámica de colisiones, pérdida de HTTP, timeout ni reintentos.
+- Logs unificados de Supabase (22:14–23:16 UTC): 147 `postgres_logs`, 3 `pgbouncer_logs`; búsqueda de ERROR/FATAL en `event_message` sin coincidencias en esa ventana. No extrapolar a todos los servicios ni periodos.
+
+## Site y cambio relevante respecto al control anterior
+- `agent_status`: 65 trabajos: **60 done, 2 failed históricos, 3 cancelled; 0 pendientes**, `health.autonomy.status=recent`, cron principal con ciclo reciente `idle`, sin `deferred_until`.
+- **Cuota actual 20/20**, frente a 17/20 en el control 16:18. No intentar nuevas pruebas de modelo hasta reinicio normal de cuota; no cambiar límites, `not_before` ni fechas.
+- El Site registra una **nota de despliegue posterior** titulada `Modelos Gemini — producción v58 y comprobación real 29-10-2026`: declara `version=58`, `deployment_status=succeeded`, `source=207466f651085ed04ec5ed0cc3cdc1628b17f3a6`, `deployment=appgdep_6ae3cfc470ac819191fb9c00a7034887`. Esto es **evidencia registrada por el Site**, no una inspección nativa independiente del hash actualmente servido. No se desplegó ni alteró v54 en esta auditoría.
+- En `health.model_checks`, tres **sondas sintéticas recientes** (realizadas por otro flujo, no por esta auditoría) indican: primario `gemini-2.5-flash` HTTP 404/no verificado; respaldo `gemini-2.5-flash-lite` HTTP 404/no verificado; tercer modelo `gemini-3.5-flash-lite` HTTP 200/verificado con `CONEXION_OK`. La nota dice que las pruebas de fallback timeout/503 fueron simuladas; **no existe aquí certificación E2E del fallback real frente a los HTTP 404**. No afirmar que los tres modelos funcionan, ni atribuir causa del 404 sin diagnóstico. La cuota se agotó con las tres sondas.
+- `AGENTS.md` de main inspeccionado; preservación del Site, separación de proyectos, seis agentes, pruebas previas a publicación y no declarar autonomía sin evidencia. Fuente nativa original v53 identificada por el usuario como `5be977154cc15c9511787d22e28b7367e6f00467` y 122 pruebas de servidor históricamente aprobadas; no se reejecutaron. El identificador no se resolvió como commit GitHub mediante `fetch_commit`; no deducir que la fuente nativa de Sites esté perdida.
+- **7 workflows** leídos individualmente en `main`: agent-runner, diagnostic-a-scheduler, diagnostic-b-conditions, diagnostic-c-actor, factory-regression, training-regression, verify-training. Ninguno declara `schedule:` ni `cron:`. `workflow_dispatch`, `push`, `pull_request` no equivalen a ejecución programada.
+- Automatización existente `Respaldo de pendientes Fábrica IA` (ID `6adbf94d28e8819189c0516c6068457a`): `is_enabled=true`, último intento registrado `completed` a 22:46:30 UTC; `latest_result=null`, sin inferir entrega. No se invocó ni modificó.
+
+## Pendientes técnicos sin aprobar
+1. Con acceso nativo de Sites, verificar fuente/hash de la versión **efectivamente desplegada** (la nota apunta a v58), comparar sin reemplazos con v53 recuperada y v54 guardada; separar fuentes de pruebas de cambios desplegados.
+2. En entorno aislado y sin competir con el cron, probar simultaneidad, leases, pausas, cancelaciones, idempotencia por trabajo, fallos de transporte, reintentos y respeto de `not_before`.
+3. Tras reinicio normal de cuota, diagnosticar **HTTP 404 de modelos primario/respaldo** y validar fallback real del ejecutor con recibo, sin modificar proveedor, facturación o producción por esta auditoría.
+4. E2E sintético correlacionado con recibos de trabajo y UUID, separado de aceptación del cliente. Ninguna nueva prueba sintética fue lanzada aquí.
+5. Aceptación final por cliente real cuando exista; **no certificación automática**.
+
+**Resultado:** cron principal y respaldo conservados; sin regresión de programación o idempotencia demostrada. **Hallazgo operativo nuevo:** 2 modelos configurados devuelven 404 y la cuota está en 20/20; el tercer modelo respondió a una sonda, pero el fallback real no quedó certificado. Sin cambio seguro de producción justificado con la evidencia actual. **Punto 4 cerrado provisionalmente, sin certificación.**
