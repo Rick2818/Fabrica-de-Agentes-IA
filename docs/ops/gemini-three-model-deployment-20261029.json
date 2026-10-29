@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-29",
+  "site": "appgprj_6adbf0c05a0c8191b2ca585b76f5e862",
+  "version": 57,
+  "source_commit": "0ff432b29d355fa5837a77f7251328ca37813b38",
+  "deployment_id": "appgdep_6ae3cf33b1d8819197048d5a39d72286",
+  "status": "succeeded",
+  "env_revision": 6,
+  "url": "https://agente-ricardo-revision-rick.rick271711.chatgpt.site",
+  "models": {
+    "primary": "gemini-2.5-flash",
+    "backup": "gemini-2.5-flash-lite",
+    "third": "gemini-3.5-flash-lite"
+  },
+  "tests": {
+    "server": 130,
+    "runner": 10,
+    "fallback": "simulated timeout/503/third-success; SQL real; no simulated result presented as provider proof"
+  },
+  "live_probe": "in_progress; explicit authenticated UI request; three constant synthetic prompts; existing quota20 respected",
+  "billing": "No activation or credential changes",
+  "audience": "custom preserved"
+}
