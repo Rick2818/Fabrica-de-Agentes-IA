@@ -1,0 +1,110 @@
+diff --git a/docs/gemini-dual-model-20261029.md b/docs/gemini-dual-model-20261029.md
+index 3b655eb..81d9317 100644
+--- a/docs/gemini-dual-model-20261029.md
++++ b/docs/gemini-dual-model-20261029.md
+@@ -8,4 +8,6 @@ La misma ejecución intenta respaldo tras timeout, error de red, 404 o HTTP500/5
+ 
+ Aprendamos juntos incluye diagnóstico explícito por los tres modelos,3 solicitudes sintéticas con texto fijo CONEXION_OK; endpoint autenticado/mismo origen, cuota y pausa. Guarda recibos separados model_check:primary y model_check:backup y model_check:third. No crea objetivos ni encarga acciones externas. Una comprobación de conexión no acredita calidad de todas las capacidades.
+ 
+-Validación:130 comprobaciones servidor SQLlocal/Gemini simulado;10 ejecutorHTTPsimulado; build y artefactoESM. Simulación de timeout/503 demuestra enrutamiento, no una caída real de Google. Comprobación real de modelos después de publicación pendiente de recibos.
++Validación:131 comprobaciones servidor SQLlocal/Gemini simulado;10 ejecutorHTTPsimulado; build y artefactoESM. Simulación de timeout/503 demuestra enrutamiento, no una caída real de Google. Comprobación real de modelos después de publicación pendiente de recibos.
++
++Prueba real v57:2.5Flash HTTP404;2.5FlashLite HTTP404;3.5FlashLite respondió CONEXION_OK. No afirmar cuota2.5 ni que los tres funcionan. v58 omite modelos con404 persistido (comprobación o ejecución) hasta diagnóstico posterior exitoso. Conserva selección de Ricardo y devuelve disponibles al tablero. No gasta cuota repitiendo404 conocidos.
+diff --git a/evidence/gemini-dual-model-tests-20261029.json b/evidence/gemini-dual-model-tests-20261029.json
+index 753fc13..9b8f69d 100644
+--- a/evidence/gemini-dual-model-tests-20261029.json
++++ b/evidence/gemini-dual-model-tests-20261029.json
+@@ -1,5 +1,5 @@
+ {
+-  "passed": 130,
++  "passed": 131,
+   "scope": "Local SQL real; Gemini simulado para fallos, cancelaci\u00f3n y recuperaci\u00f3n.",
+   "checks": [
+     "Duplicados conservan un \u00fanico encargo",
+@@ -131,6 +131,7 @@
+     "Modelos: fallo doble conserva tarea, recibo y un solo resultado futuro",
+     "Modelos: comprobaci\u00f3n sint\u00e9tica exige identidad y respeta pausa y cuota",
+     "Modelos: tercer modelo responde cuando fallan los dos primeros",
+-    "Modelos: pausa global entre intentos y m\u00e1ximo del objetivo impiden llamadas extra"
++    "Modelos: pausa global entre intentos y m\u00e1ximo del objetivo impiden llamadas extra",
++    "Modelos: comprobaciones 404 omiten modelos no disponibles sin consumir llamadas"
+   ]
+ }
+diff --git a/scripts/test-agent.mjs b/scripts/test-agent.mjs
+index 38ca972..3214313 100644
+--- a/scripts/test-agent.mjs
++++ b/scripts/test-agent.mjs
+@@ -356,5 +356,10 @@ await test('Modelos: pausa global entre intentos y máximo del objetivo impiden
+  for(const mode of ['pause','objective']){const local=new D1();local.db.exec(migration);if(mode==='objective'){await createObjective(local,goalInput('goal-fallback-cap'));local.db.prepare("UPDATE objectives SET api_calls=7").run();}else await enqueue(local,{id:'pause-fallback',kind:'task',title:'Pausa',text:'Prueba'});let calls=0;globalThis.fetch=async()=>{calls++;if(mode==='pause')local.db.prepare("INSERT INTO settings VALUES('automation',?)").run(JSON.stringify({enabled:false}));return new Response('{}',{status:503});};await runNext(local,env);assert.equal(calls,1);local.db.close();}
+ });
+ 
++
++await test('Modelos: comprobaciones 404 omiten modelos no disponibles sin consumir llamadas',async()=>{
++ const local=new D1();local.db.exec(migration);for(const [role,model] of [['primary','gemini-2.5-flash'],['backup','gemini-2.5-flash-lite']])local.db.prepare('INSERT INTO settings VALUES(?,?)').run('model_check:'+role,JSON.stringify({model,http:404,verified:false}));await enqueue(local,{id:'skip-models-404',kind:'task',title:'Disponible',text:'Prueba'});let calls=0;globalThis.fetch=async url=>{calls++;assert(String(url).includes('gemini-3.5-flash-lite'));return answer('Disponible');};assert.equal((await runNext(local,env)).status,'done');assert.equal(calls,1);const b=await board(local);assert.equal(b.usage.used,1);assert.equal(JSON.parse(b.jobs[0].evidence).model,'gemini-3.5-flash-lite');local.db.close();
++});
++
+ globalThis.fetch=originalFetch;
+ console.log(JSON.stringify({passed:checks.length,scope:'Local SQL real; Gemini simulado para fallos, cancelación y recuperación.',checks}));
+diff --git a/web/app.js b/web/app.js
+index 04857da..150d044 100644
+--- a/web/app.js
++++ b/web/app.js
+@@ -12,7 +12,7 @@ const activeChat=()=>state?.jobs.find(j=>j.kind==='chat'&&['queued','running','w
+ function controls(){const busy=sending||!!activeChat();$('send').disabled=busy||!state;$('prompt').disabled=busy||!state;$('send').textContent=busy?'…':'↑';updateCompanion();}
+ function renderMessages(){const box=$('messages');const scroll=box.scrollHeight-box.scrollTop-box.clientHeight<80;box.replaceChildren();$('welcome').hidden=state.messages.length>0;for(const m of state.messages){const a=make('article','message '+(m.role==='user'?'user':'assistant'));a.append(make('div','message-label',m.role==='user'?'Vos':'Agente IA'),make('p','',m.text));box.append(a);}const job=activeChat();if(job){const a=make('article','working',job.status==='waiting'?job.error:'El agente está preparando tu respuesta…');a.append(make('p','',job.status==='waiting'?'Próximo intento: '+date(job.next_attempt_at):'Podés cerrar la página; el encargo ya está guardado.'));const b=make('button','secondary','Cancelar respuesta');b.addEventListener('click',()=>action('/api/cancel',{id:job.id}));a.append(b);box.append(a);}const last=state.jobs.find(j=>j.kind==='chat');if(last?.status==='failed'){const a=make('article','error',last.error);const b=make('button','secondary','Reintentar');b.addEventListener('click',()=>action('/api/retry',{id:last.id}));a.append(b);box.append(a);}if(scroll)box.scrollTop=box.scrollHeight;}
+ function taskCard(job){const card=make('article','task-card'),head=make('div','task-head');head.append(make('h3','',job.title),make('span','badge '+job.status,labels[job.status]||job.status));card.append(head,make('p','',job.input),make('p','', 'Creada: '+date(job.created_at)));if(job.status==='queued'&&job.due_at>Date.now())card.append(make('p','', 'Programada para: '+date(job.due_at)));if(job.error)card.append(make('p','error',job.error));if(job.status==='waiting')card.append(make('p','', 'Próximo intento: '+date(job.next_attempt_at)));if(job.result){const d=make('details');d.append(make('summary','', 'Ver resultado'),make('p','result',job.result));const download=make('button','secondary','Descargar resultado');download.addEventListener('click',()=>save(job.title+'\n\n'+job.result,job.title));d.append(download);let evidence;try{evidence=JSON.parse(job.evidence)}catch{}if(evidence)d.append(make('p','evidence',evidence.model+' · HTTP '+evidence.http+' · '+date(evidence.completed_at)),make('p','evidence hash','SHA-256: '+evidence.sha256));card.append(d);}if(['queued','running','waiting'].includes(job.status)){const b=make('button','secondary','Cancelar tarea');b.addEventListener('click',()=>action('/api/cancel',{id:job.id}));card.append(b);}if(job.status==='failed'){const b=make('button','secondary','Reintentar');b.addEventListener('click',()=>action('/api/retry',{id:job.id}));card.append(b);}return card;}
+-function render(){if(!state)return;const content=JSON.stringify({jobs:state.jobs,messages:state.messages,notes:state.notes,objectives:state.objectives,updates:state.updates,notifications:state.notifications,autonomy:state.health?.autonomy});if(content!==renderedContent){renderedContent=content;renderObjectives();renderNotifications();renderMessages();$('task-list').replaceChildren();const tasks=state.jobs.filter(j=>j.kind==='task'&&!j.objective_id);if(!tasks.length)$('task-list').append(make('p','empty','Todavía no hay tareas. Creá tu primer encargo arriba.'));else tasks.forEach(j=>$('task-list').append(taskCard(j)));$('note-list').replaceChildren();if(!state.notes.length)$('note-list').append(make('p','empty','Todavía no hay notas guardadas. Podés agregar una o pedirle al agente que la recuerde.'));for(const n of state.notes){const a=make('article','note');a.append(make('span','','◇'));const body=make('div');body.append(make('h3','',n.title),make('p','',n.content));const b=make('button','secondary','Editar');b.addEventListener('click',()=>{$('note-title').value=n.title;$('note-content').value=n.content;$('note-content').focus();});body.append(b);a.append(body);$('note-list').append(a);}} $('connection').textContent='Tu trabajo está guardado';const next=state.health?.next_run_at;const last=state.health?.last_run; $('runtime-status').textContent=state.health?.configured===false?'La conexión con Gemini necesita configuración. Tus datos están guardados.':next&&next-state.server_time>90000?'El ejecutor está en espera. Próxima disponibilidad: '+date(next)+'.':last?'Última actividad: '+date(last.started_at)+'.':'';$('model-config').textContent=state.models?'Principal: '+state.models.primary+' · Respaldo: '+state.models.backup+' · Tercero: '+state.models.third:'';$('quota').textContent=state.usage.used+' de '+state.usage.limit+' solicitudes del día en esta app. Google puede aplicar una cuota menor.';$('scheduler').textContent=state.automation?.enabled?'Revisión en nube habilitada. Última comprobación de configuración: '+(state.automation.verified_at?date(state.automation.verified_at):'pendiente')+'. Consultá el resultado de cada tarea para confirmar su ejecución.':'La revisión automática está pausada o sin verificar. Tus encargos se conservan; el ejecutor en la nube debe retomar los que ya puedan ejecutarse.';controls();}
++function render(){if(!state)return;const content=JSON.stringify({jobs:state.jobs,messages:state.messages,notes:state.notes,objectives:state.objectives,updates:state.updates,notifications:state.notifications,autonomy:state.health?.autonomy});if(content!==renderedContent){renderedContent=content;renderObjectives();renderNotifications();renderMessages();$('task-list').replaceChildren();const tasks=state.jobs.filter(j=>j.kind==='task'&&!j.objective_id);if(!tasks.length)$('task-list').append(make('p','empty','Todavía no hay tareas. Creá tu primer encargo arriba.'));else tasks.forEach(j=>$('task-list').append(taskCard(j)));$('note-list').replaceChildren();if(!state.notes.length)$('note-list').append(make('p','empty','Todavía no hay notas guardadas. Podés agregar una o pedirle al agente que la recuerde.'));for(const n of state.notes){const a=make('article','note');a.append(make('span','','◇'));const body=make('div');body.append(make('h3','',n.title),make('p','',n.content));const b=make('button','secondary','Editar');b.addEventListener('click',()=>{$('note-title').value=n.title;$('note-content').value=n.content;$('note-content').focus();});body.append(b);a.append(body);$('note-list').append(a);}} $('connection').textContent='Tu trabajo está guardado';const next=state.health?.next_run_at;const last=state.health?.last_run; $('runtime-status').textContent=state.health?.configured===false?'La conexión con Gemini necesita configuración. Tus datos están guardados.':next&&next-state.server_time>90000?'El ejecutor está en espera. Próxima disponibilidad: '+date(next)+'.':last?'Última actividad: '+date(last.started_at)+'.':'';$('model-config').textContent=state.models?'Principal: '+state.models.primary+' · Respaldo: '+state.models.backup+' · Tercero: '+state.models.third+' · Disponibles: '+state.models.available.join(', '):'';$('quota').textContent=state.usage.used+' de '+state.usage.limit+' solicitudes del día en esta app. Google puede aplicar una cuota menor.';$('scheduler').textContent=state.automation?.enabled?'Revisión en nube habilitada. Última comprobación de configuración: '+(state.automation.verified_at?date(state.automation.verified_at):'pendiente')+'. Consultá el resultado de cada tarea para confirmar su ejecución.':'La revisión automática está pausada o sin verificar. Tus encargos se conservan; el ejecutor en la nube debe retomar los que ya puedan ejecutarse.';controls();}
+ function updateCompanion(){
+  const actor=$('agent-character');const chat=activeChat();
+  let mode=!state?'loading':sending||state.jobs.some(j=>j.status==='running')||chat?.status==='queued'?'working':chat?.status==='waiting'?'waiting':state.health?.configured===false?'offline':'idle';
+diff --git a/worker/runtime.mjs b/worker/runtime.mjs
+index 53e12a0..db02d1d 100644
+--- a/worker/runtime.mjs
++++ b/worker/runtime.mjs
+@@ -11,6 +11,11 @@ const MODEL='gemini-2.5-flash';
+ const BACKUP_MODEL='gemini-2.5-flash-lite';
+ const THIRD_MODEL='gemini-3.5-flash-lite';
+ const ACTIVE=['queued','running','waiting'];
++async function availableModels(db){
++ const configured=[MODEL,BACKUP_MODEL,THIRD_MODEL],roles=['primary','backup','third'],available=[];
++ for(const [i,model] of configured.entries()){const check=await trainingGet(db,'model_check:'+roles[i]);const failure=await trainingGet(db,'model_unavailable:'+model);if(check?.model===model&&check.verified&&(!failure||check.completed_at>failure.at)||!failure&&!(check?.model===model&&check.http===404))available.push(model);}
++ return available;
++}
+ const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+ const stmt=(db,sql,...args)=>db.prepare(sql).bind(...args);
+ const rows=async(db,sql,...args)=>(await stmt(db,sql,...args).all()).results;
+@@ -147,7 +152,7 @@ export async function board(db,now=Date.now(),env={}){
+  let cloud=null,last=null;try{cloud=JSON.parse(automation?.value||'null');last=JSON.parse(lastRun?.value||'null')}catch{}
+  const receipt=await first(db,"SELECT value FROM settings WHERE key='cloud_runner_receipt'");
+  const [notifications,autonomy]=await Promise.all([rows(db,'SELECT * FROM notifications ORDER BY created_at DESC,id DESC LIMIT 100'),continuity(db,now)]);
+- return {jobs,messages,notes,objectives,updates,notifications,commercial:await commercialBoard(db),usage:{used:usage.n,limit:20},automation:cloud,model:MODEL,models:{primary:MODEL,backup:BACKUP_MODEL,third:THIRD_MODEL,fallback_on:['timeout','network','http_5xx','model_not_found'],quota_policy:'shared_20_calls_daily_no_429_bypass'},server_time:now,health:{configured:!!env.GOOGLE_GENERATIVE_AI_API_KEY,next_run_at:runner?.expires>now?runner.expires:null,last_run:last,model_last_attempt:await trainingGet(db,'model_last_attempt'),cloud_runner:receipt?JSON.parse(receipt.value):null,supabase_runner:await trainingGet(db,'supabase_runner_receipt'),autonomy}};
++ return {jobs,messages,notes,objectives,updates,notifications,commercial:await commercialBoard(db),usage:{used:usage.n,limit:20},automation:cloud,model:MODEL,models:{primary:MODEL,backup:BACKUP_MODEL,third:THIRD_MODEL,available:await availableModels(db),fallback_on:['timeout','network','http_5xx','model_not_found'],quota_policy:'shared_20_calls_daily_no_429_bypass'},server_time:now,health:{configured:!!env.GOOGLE_GENERATIVE_AI_API_KEY,next_run_at:runner?.expires>now?runner.expires:null,last_run:last,model_checks:{primary:await trainingGet(db,'model_check:primary'),backup:await trainingGet(db,'model_check:backup'),third:await trainingGet(db,'model_check:third')},model_last_attempt:await trainingGet(db,'model_last_attempt'),cloud_runner:receipt?JSON.parse(receipt.value):null,supabase_runner:await trainingGet(db,'supabase_runner_receipt'),autonomy}};
+ }
+ export async function runRecordedCycle(db,env,a={},now=Date.now()){
+  const scheduled=a.trigger==='scheduled';
+@@ -228,12 +233,13 @@ export async function runNext(db,env,now=Date.now()){
+     const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{
+      method:'POST',headers:{'content-type':'application/json','x-goog-api-key':env.GOOGLE_GENERATIVE_AI_API_KEY},
+      body:JSON.stringify(requestBody),signal:AbortSignal.timeout(model===MODEL?18000:model===BACKUP_MODEL?15000:12000)});
+-    const data=await response.json();modelAttempts.push({model,http:response.status,started_at:started,completed_at:Date.now()});return {response,data};
++    const data=await response.json();if(response.status===404)await trainingSet(db,'model_unavailable:'+model,{model,at:Date.now(),http:404});modelAttempts.push({model,http:response.status,started_at:started,completed_at:Date.now()});return {response,data};
+    }catch(e){modelAttempts.push({model,error:e.name==='TimeoutError'?'timeout':e instanceof SyntaxError?'invalid_json':'network',started_at:started,completed_at:Date.now()});throw e;}
+    finally{await trainingSet(db,'model_last_attempt',{job_id:job.id,selected_model:model,attempts:modelAttempts,at:Date.now()});}
+   };
+   let response,data,primaryError;
+-  const models=[MODEL,BACKUP_MODEL,THIRD_MODEL];
++  const models=await availableModels(db);
++  if(!models.length)throw Object.assign(Error('No hay modelos disponibles para esta clave; comprobá la conexión.'),{code:'no_model_available'});
+   for(const [index,model] of models.entries()){
+    if(index){
+     // Every extra call reserves the shared budget under the same live lease.
+@@ -311,7 +317,7 @@ export async function runNext(db,env,now=Date.now()){
+   const result=await db.batch(changes);
+   return {status:result.at(-1)?.meta?.changes?'done':'cancelled',id:job.id,...(objective?{objective_id:objective.id,phase:job.phase}:{})};
+  }catch(e){
+-  if(job){const message=e.code==='unsupported_support_action'?e.message:e.name==='TimeoutError'?'Gemini tardó demasiado. Se reintentará sin duplicar el resultado.':e instanceof SyntaxError?'Gemini devolvió un formato incompleto. Se reintentará.':'No se pudo completar el resultado. Se reintentará si quedan intentos.';await failJob(db,job,token,message,job.attempts<2?60000:null,Date.now());if(objective&&job.attempts>=2)await blockObjective(db,objective,message,Date.now());}
++  if(job){const message=['unsupported_support_action','no_model_available'].includes(e.code)?e.message:e.name==='TimeoutError'?'Gemini tardó demasiado. Se reintentará sin duplicar el resultado.':e instanceof SyntaxError?'Gemini devolvió un formato incompleto. Se reintentará.':'No se pudo completar el resultado. Se reintentará si quedan intentos.';await failJob(db,job,token,message,job.attempts<2?60000:null,Date.now());if(objective&&job.attempts>=2)await blockObjective(db,objective,message,Date.now());}
+   return {status:'error',id:job?.id||null};
+  }finally{await stmt(db,'UPDATE runner_lock SET expires=? WHERE id=1 AND token=?',lockUntil,token).run();}
+ }
