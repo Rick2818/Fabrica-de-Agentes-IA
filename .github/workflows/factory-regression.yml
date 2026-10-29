@@ -1,0 +1,45 @@
+name: Factory production gates (local providers only)
+on:
+  pull_request:
+    paths:
+      - 'worker/**'
+      - 'web/**'
+      - 'scripts/**'
+      - 'drizzle/**'
+      - '.github/workflows/factory-regression.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Factory reception, state, recovery and safety regressions
+        run: node scripts/test-factory.mjs
+      - name: Preserved agent runtime
+        run: node scripts/test-agent.mjs
+      - name: Existing cloud runner
+        run: node scripts/test-cloud-runner.mjs
+      - name: Existing specialist tools
+        run: node scripts/test-leo-public-tools.mjs
+      - name: Google authorization isolation (simulated)
+        run: node scripts/test-google-connection.mjs
+      - name: Preserved training interface
+        run: node scripts/test-training-ui.mjs
+      - name: Expression and voice regressions
+        run: |
+          node scripts/test-expression.mjs
+          node scripts/test-voice-routing.mjs
+      - name: Factory frontend syntax
+        run: node --check web/factory.js
+      - name: Build original Worker and validate artifact
+        run: |
+          node scripts/build.mjs
+          node scripts/validate-artifact.mjs
+      - name: Verify production bugfix scope in the built artifact
+        run: node scripts/test-bugfix-release.mjs

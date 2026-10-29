@@ -1,7 +1,9 @@
+import {factoryRoute} from './factory.mjs';
 import {AGENT_TOOL_DECLARATIONS,AGENT_TOOL_INSTRUCTION,readPublicPage} from './agent-tools.mjs';
 import {SALES_PROSPECTING_SKILL} from './sales-prospecting.mjs';
 import {leoPublicTool} from './leo-public-tools.mjs';
 import {leoCRM} from './leo-crm.mjs';
+import {googleConnection} from './google-connection.mjs';
 import {EXPRESSION_SKILLS,expressionScore} from './expression.mjs';
 import {SPECIALTY_SKILLS,selectedSpecialtySkills,SPECIALTY_TOOLKITS} from './specialty-skills.mjs';
 import {specialistTool,SPECIALIST_OPERATIONS} from './specialist-tools.mjs';
@@ -39,6 +41,21 @@ function validateOutput(o){
  if(o.notes.some(n=>!text(n.title,120)||!text(n.content,4000))||o.tasks.some(t=>!text(t.title,160)||!text(t.prompt,12000)))throw Error('Gemini devolvió datos inválidos.');
  return o;
 }
+// This check covers operational claims in support replies, including quoted drafts.
+// It is deliberately bounded; it is not a general fact checker.
+export const SUPPORT_EVIDENCE_RULE='Acciones y soporte: diferenciá hechos comprobados, recomendaciones y borradores. No afirmés que un equipo técnico ya analiza, trabaja, revisa o atiende un incidente, ni que registraste, escalaste o enviaste una solicitud: esta cola de texto no ejecuta esas acciones. Tampoco dentro de un borrador. Sin un recibo de esa acción, usá «es necesaria una revisión técnica» o «se recomienda solicitarla», sin inventar plazos. Una nota o un resultado anterior de IA no acredita la acción externa.';
+export function assertSupportEvidence(reply){
+ const normalized=reply.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ const sentences=normalized.split(/[.!?;\n]+/);
+ for(const sentence of sentences){
+  // Negated or explicitly hypothetical statements do not assert execution.
+  if(/^\s*[«"'>]*(?:no (?:hay (?:evidencia|confirmacion)|esta confirmado|se ha confirmado|es cierto)|sin (?:evidencia|confirmacion)|si\b|cuando\b|se recomienda\b|es necesari[oa]\b|there is no (?:evidence|confirmation)|it is not confirmed)/.test(sentence))continue;
+  const team=/\b(?:el|nuestro) equipo (?:tecnico|de soporte)\s+(?:ya\s+)?(?:se (?:encuentra|halla)\s+|esta\s+|sigue\s+|continua\s+)?(?:analizando|trabajando|revisando|atendiendo|investigando|analiza|trabaja|revisa|atiende|investiga|ha (?:iniciado|comenzado|recibido))\b/.test(sentence);
+  const firstPerson=/\b(?:he|hemos) (?:enviado|escalado|notificado|contactado)\b|\b(?:envie|enviamos|escale|escalamos|notifique|notificamos|contacte|contactamos)\b/.test(sentence);
+  const english=/\b(?:the|our) (?:technical|support) team (?:is (?:already )?(?:working|investigating|reviewing|analyzing)|has (?:already )?(?:started|received))\b|\b(?:i have|we have|i've|we've) (?:sent|escalated|notified|contacted)\b/.test(sentence);
+  if(team||firstPerson||english)throw Object.assign(Error('La respuesta atribuye una acción de soporte sin recibo verificable. Debe reformularse como recomendación, sin afirmar ejecución ni plazos.'),{code:'unsupported_support_action'});
+ }
+}
 export async function enqueue(db,input,now=Date.now()){
  if(!validId(input.id)||!['task','chat'].includes(input.kind)||!text(input.text,12000))throw Object.assign(Error('Revisá el mensaje de la tarea.'),{status:400});
  if(input.use_saved_context!=null&&typeof input.use_saved_context!=='boolean')throw Object.assign(Error('La opción de memoria es inválida.'),{status:400});
@@ -72,23 +89,31 @@ export async function acknowledgeNotifications(db,ids,channel,now=Date.now()){
 }
 export async function continuity(db,now=Date.now()){
  const cycles=await rows(db,'SELECT * FROM agent_cycles ORDER BY started_at DESC,id DESC LIMIT 40');
- const latest=cycles.find(c=>['scheduled','github-actions'].includes(c.source)&&c.completed_at);
+ // Re-runs inherit GitHub's original event='schedule'. Their attempt number
+ // must not refresh evidence of an automatic scheduler firing.
+ const automatic=c=>c.completed_at&&(c.source==='scheduled'||c.source==='supabase-cron'||c.source==='github-actions'&&/^\d+-1$/.test(c.cycle_id));
+ const latest=cycles.find(automatic);
+ const manual=cycles.find(c=>c.completed_at&&(c.source==='github-actions-manual'||c.source==='github-actions'&&!/^\d+-1$/.test(c.cycle_id)));
  const raw=await first(db,"SELECT value FROM settings WHERE key='scheduler_check'");
  const watcher=await first(db,"SELECT value FROM settings WHERE key='watchdog_check'");
  let check=null,watchdog=null;try{check=JSON.parse(raw?.value||'null');watchdog=JSON.parse(watcher?.value||'null')}catch{}
  const active=await first(db,"SELECT count(*) AS n,MIN(CASE WHEN status='running' THEN lease_until ELSE next_attempt_at END) AS due FROM jobs WHERE status IN ('queued','waiting','running')");
  const configuration=await first(db,"SELECT value FROM settings WHERE key='automation'");let enabled=false,configured=null;try{configured=JSON.parse(configuration?.value||'null');enabled=configured?.enabled===true}catch{}
- const primary=typeof configured?.id==='string'?await first(db,"SELECT * FROM agent_cycles WHERE schedule_id=? AND source IN ('scheduled','github-actions') AND completed_at IS NOT NULL ORDER BY completed_at DESC,id DESC LIMIT 1",configured.id):latest;
- const backup=typeof configured?.id==='string'?cycles.find(c=>['scheduled','github-actions'].includes(c.source)&&c.schedule_id!==configured.id&&c.completed_at):null;
- const primaryStale=!primary||now-primary.completed_at>(primary.source==='github-actions'?45:90)*60000;
- const stale=!latest||now-latest.completed_at>(latest.source==='github-actions'?45:90)*60000;
+ const primary=typeof configured?.id==='string'?await first(db,"SELECT * FROM agent_cycles WHERE schedule_id=? AND (source IN ('scheduled','supabase-cron') OR (source='github-actions' AND cycle_id GLOB '[0-9]*-1')) AND completed_at IS NOT NULL ORDER BY completed_at DESC,id DESC LIMIT 1",configured.id):latest;
+ const backup=typeof configured?.id==='string'?cycles.find(c=>automatic(c)&&c.schedule_id!==configured.id):null;
+ const freshness=c=>c?.source==='supabase-cron'?5:c?.source==='github-actions'?45:90;
+ const primaryStale=!primary||now-primary.completed_at>freshness(primary)*60000;
+ const supabaseReceipt=await trainingGet(db,'supabase_runner_receipt');
+ const runnerWait=await first(db,'SELECT expires FROM runner_lock WHERE id=1');
+ const deferredUntil=enabled&&primary?.source==='supabase-cron'&&['quota','waiting','busy'].includes(primary.status)&&supabaseReceipt?.supabase?.run_id===primary.cycle_id&&supabaseReceipt.status===primary.status&&Number.isSafeInteger(supabaseReceipt.next_at)&&supabaseReceipt.next_at>now&&runnerWait?.expires>=supabaseReceipt.next_at?supabaseReceipt.next_at:null;
+ const stale=!latest||now-latest.completed_at>freshness(latest)*60000;
  const observedDisabled=check&&now-check.checked_at<90*60000&&!check.is_enabled;
  const attention=(check&&now-check.checked_at<90*60000&&(check.requires_user_action||check.status==='failed'))||(watchdog&&now-watchdog.checked_at<90*60000&&(!watchdog.is_enabled||watchdog.requires_user_action||watchdog.status==='failed'));
  const runnerError=primary&&['failed','error'].includes(primary.status)&&!primaryStale;
- const status=!enabled&&configuration?'paused':observedDisabled?'stopped':attention||runnerError?'attention':enabled&&configured?.id&&primaryStale?(latest&&!stale?'degraded':'unverified'):latest&&!stale?'recent':enabled?'unverified':'unconfigured';
+ const status=!enabled&&configuration?'paused':observedDisabled?'stopped':attention||runnerError?'attention':deferredUntil?'waiting':enabled&&configured?.id&&primaryStale?(latest&&!stale?'degraded':'unverified'):latest&&!stale?'recent':enabled?'unverified':'unconfigured';
  // Heartbeats from either scheduler cannot hide a long-overdue queue item.
- const stalled=active.n>0&&active.due!=null&&now-active.due>90*60000;
- return {status,last_scheduled_cycle:latest||null,primary:{schedule_id:configured?.id||null,last_cycle:primary||null,recent:!primaryStale},backup:{last_cycle:backup||null,recent:!!backup&&now-backup.completed_at<=90*60000},cycles,scheduler_check:check,watchdog_check:watchdog,stalled,pending:active.n,oldest_due:active.due||null};
+ const stalled=!deferredUntil&&active.n>0&&active.due!=null&&now-active.due>90*60000;
+ return {status,deferred_until:deferredUntil,last_scheduled_cycle:latest||null,last_manual_cycle:manual||null,primary:{schedule_id:configured?.id||null,last_cycle:primary||null,recent:!primaryStale},backup:{last_cycle:backup||null,recent:!!backup&&now-backup.completed_at<=90*60000},cycles,scheduler_check:check,watchdog_check:watchdog,stalled,pending:active.n,oldest_due:active.due||null};
 }
 export async function recordSchedulerCheck(db,a,now=Date.now()){
  if(!text(a.schedule_id,200)||typeof a.is_enabled!=='boolean'||typeof a.requires_user_action!=='boolean'||!['completed','in_progress','failed','no_update','unknown'].includes(a.status)||!(a.run_id==null||text(a.run_id,200)))throw Object.assign(Error('Comprobación inválida.'),{status:400});
@@ -120,17 +145,17 @@ export async function board(db,now=Date.now(),env={}){
  let cloud=null,last=null;try{cloud=JSON.parse(automation?.value||'null');last=JSON.parse(lastRun?.value||'null')}catch{}
  const receipt=await first(db,"SELECT value FROM settings WHERE key='cloud_runner_receipt'");
  const [notifications,autonomy]=await Promise.all([rows(db,'SELECT * FROM notifications ORDER BY created_at DESC,id DESC LIMIT 100'),continuity(db,now)]);
- return {jobs,messages,notes,objectives,updates,notifications,commercial:await commercialBoard(db),usage:{used:usage.n,limit:20},automation:cloud,model:MODEL,server_time:now,health:{configured:!!env.GOOGLE_GENERATIVE_AI_API_KEY,next_run_at:runner?.expires>now?runner.expires:null,last_run:last,cloud_runner:receipt?JSON.parse(receipt.value):null,autonomy}};
+ return {jobs,messages,notes,objectives,updates,notifications,commercial:await commercialBoard(db),usage:{used:usage.n,limit:20},automation:cloud,model:MODEL,server_time:now,health:{configured:!!env.GOOGLE_GENERATIVE_AI_API_KEY,next_run_at:runner?.expires>now?runner.expires:null,last_run:last,cloud_runner:receipt?JSON.parse(receipt.value):null,supabase_runner:await trainingGet(db,'supabase_runner_receipt'),autonomy}};
 }
 export async function runRecordedCycle(db,env,a={},now=Date.now()){
  const scheduled=a.trigger==='scheduled';
  if(a.trigger!=null&&!['scheduled','manual'].includes(a.trigger))throw Object.assign(Error('Disparador inválido.'),{status:400});
  if(scheduled&&(!text(a.cycle_id,200)||!text(a.schedule_id,200)))throw Object.assign(Error('La ejecución programada necesita el identificador del registro y de su programación.'),{status:400});
- const id=crypto.randomUUID(),source=scheduled?(env.RUN_SOURCE==='github-actions'?'github-actions':'scheduled'):'mcp',cycleId=scheduled?a.cycle_id:id;
+ const id=crypto.randomUUID(),source=scheduled?(env.RUN_SOURCE==='supabase-cron'?'supabase-cron':env.RUN_SOURCE==='github-actions'?(env.GITHUB_AUTOMATIC===false?'github-actions-manual':'github-actions'):'scheduled'):'mcp',cycleId=scheduled?a.cycle_id:id;
  await stmt(db,"INSERT INTO agent_cycles(id,cycle_id,schedule_id,source,status,started_at) VALUES(?,?,?,?,'running',?)",id,cycleId,scheduled?a.schedule_id:'',source,now).run();
  try{
-  if(scheduled){const setting=await first(db,"SELECT value FROM settings WHERE key='automation'");let paused=false;try{paused=JSON.parse(setting?.value||'null')?.enabled===false}catch{}if(paused){await stmt(db,"UPDATE agent_cycles SET status='paused',completed_at=? WHERE id=?",Math.max(now,Date.now()),id).run();return {status:'paused'};}}
-  const run=await runNext(db,{...env,RUN_SOURCE:scheduled?(source==='github-actions'?'github-actions':'scheduled-mcp'):'mcp'},now);
+  if(scheduled){const setting=await first(db,"SELECT value FROM settings WHERE key='automation'");let paused=false;try{const config=JSON.parse(setting?.value||'null');paused=config?.enabled===false||(source==='supabase-cron'&&config?.id!==a.schedule_id)||(source.startsWith('github-actions')&&config?.id?.startsWith('supabase:'))}catch{}if(paused){await stmt(db,"UPDATE agent_cycles SET status='paused',completed_at=? WHERE id=?",Math.max(now,Date.now()),id).run();return {status:'paused'};}}
+  const run=await runNext(db,{...env,RUN_SOURCE:scheduled?(source==='supabase-cron'||source.startsWith('github-actions')?source:'scheduled-mcp'):'mcp'},now);
   await stmt(db,'UPDATE agent_cycles SET status=?,job_id=?,completed_at=? WHERE id=?',run.status,run.id||null,Math.max(now,Date.now()),id).run();
   await syncNotifications(db);
   return run;
@@ -189,6 +214,8 @@ export async function runNext(db,env,now=Date.now()){
   if(selectingTools)instruction+=' Si no necesitás una función, devolvé JSON {reply,notes:[],tasks:[]}.';
   if(toolEnabled)instruction=instruction.replace(objectiveSystem,objectiveSystem.replace('Tus herramientas en esta versión son generación de texto, memoria y cola persistente. NO tenés navegador, correo, acceso a otras aplicaciones, pagos ni ejecución de software.',AGENT_TOOL_INSTRUCTION));
   if(toolState){contents=[...contents,toolState.model_content,{role:'user',parts:toolState.responses}];}
+  // Append after selecting the mode: isolated jobs must not depend on saved notes.
+  instruction+='\n'+SUPPORT_EVIDENCE_RULE;
   // Use the already verified direct Google endpoint; never forward the key to the browser.
   const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent',{
    method:'POST',headers:{'content-type':'application/json','x-goog-api-key':env.GOOGLE_GENERATIVE_AI_API_KEY},
@@ -218,13 +245,13 @@ export async function runNext(db,env,now=Date.now()){
     let receipt=await trainingGet(db,receiptKey);
     if(receipt&&(receipt.operation!==call.name||JSON.stringify(receipt.arguments)!==JSON.stringify(call.args||{})))throw Error('El reintento cambió la llamada de herramienta; se conserva el recibo anterior.');
     if(!receipt){
-     let output,error;try{
+     let output,error,error_details;try{
       if(call.name==='read_public_page')output=await readPublicPage(call.args?.url);
       else if(call.name==='github_repository')output=await leoPublicTool('github_repository',call.args);
       else if(call.name==='sales_qualify')output=await specialistTool('sales_qualify',call.args);
       else throw Error('Herramienta no autorizada');
-     }catch(e){error=e.message||'Herramienta no disponible';}
-     receipt={id:job.id+'-tool-'+i,job_id:job.id,operation:call.name,arguments:call.args||{},...(error?{error}:{output}),at:Date.now(),source:'model_function_call',external_writes:false};
+     }catch(e){error=e.message||'Herramienta no disponible';error_details=e.public_diagnostics;}
+     receipt={id:job.id+'-tool-'+i,job_id:job.id,operation:call.name,arguments:call.args||{},...(error?{error,...(error_details?{error_details}:{})}:{output}),at:Date.now(),source:'model_function_call',external_writes:false};
      receipt.sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(receipt))))).map(b=>b.toString(16).padStart(2,'0')).join('');
      await stmt(db,"INSERT INTO settings(key,value) SELECT ?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running' AND lease_token=?) ON CONFLICT(key) DO NOTHING",receiptKey,JSON.stringify(receipt),job.id,token).run();
     }
@@ -237,6 +264,7 @@ export async function runNext(db,env,now=Date.now()){
   const raw=data.candidates?.[0]?.content?.parts?.filter(p=>!p.thought).map(p=>p.text||'').join('');
   const parsed=JSON.parse((raw||'null').replace(/^```(?:json)?\s*|\s*```$/g,''));
   const output=objective?objectiveOutput(job,parsed):validateOutput(parsed);
+  assertSupportEvidence(output.reply);
   if(job.kind==='task'&&output.tasks.length)throw Error('La tarea devolvió otros encargos en lugar de un resultado.');
   const completed=Date.now();
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(output.reply)))).map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -251,7 +279,7 @@ export async function runNext(db,env,now=Date.now()){
   const result=await db.batch(changes);
   return {status:result.at(-1)?.meta?.changes?'done':'cancelled',id:job.id,...(objective?{objective_id:objective.id,phase:job.phase}:{})};
  }catch(e){
-  if(job){const message=e.name==='TimeoutError'?'Gemini tardó demasiado. Se reintentará sin duplicar el resultado.':e instanceof SyntaxError?'Gemini devolvió un formato incompleto. Se reintentará.':'No se pudo completar el resultado. Se reintentará si quedan intentos.';await failJob(db,job,token,message,job.attempts<2?60000:null,Date.now());if(objective&&job.attempts>=2)await blockObjective(db,objective,message,Date.now());}
+  if(job){const message=e.code==='unsupported_support_action'?e.message:e.name==='TimeoutError'?'Gemini tardó demasiado. Se reintentará sin duplicar el resultado.':e instanceof SyntaxError?'Gemini devolvió un formato incompleto. Se reintentará.':'No se pudo completar el resultado. Se reintentará si quedan intentos.';await failJob(db,job,token,message,job.attempts<2?60000:null,Date.now());if(objective&&job.attempts>=2)await blockObjective(db,objective,message,Date.now());}
   return {status:'error',id:job?.id||null};
  }finally{await stmt(db,'UPDATE runner_lock SET expires=? WHERE id=1 AND token=?',lockUntil,token).run();}
 }
@@ -417,7 +445,9 @@ async function mcp(request,env){
 // Dispatch validates Site service access; this key narrows access to executing existing jobs.
 async function cloudRunner(request,env){
  if(request.method!=='POST')return json({error:'Método no permitido.'},405);
- const expected=env.AGENT_RUNNER_SECRET,provided=request.headers.get('x-agent-runner-key')||'';
+ const supabase=request.headers.has('x-supabase-runner-key');
+ if(supabase&&request.headers.has('x-agent-runner-key'))return json({error:'Usá una sola credencial del ejecutor.'},400);
+ const expected=supabase?env.SUPABASE_RUNNER_SECRET:env.AGENT_RUNNER_SECRET,provided=request.headers.get(supabase?'x-supabase-runner-key':'x-agent-runner-key')||'';
  if(typeof expected!=='string'||expected.length<32)return json({error:'Ejecutor no configurado.'},503);
  if(provided.length>256)return json({error:'Acceso no autorizado.'},401);
  const digest=async s=>new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)));
@@ -429,16 +459,25 @@ async function cloudRunner(request,env){
  const raw=await request.text();if(raw.length>1500)return json({error:'Solicitud demasiado larga.'},413);
  if(raw.trim()){
   try{context=JSON.parse(raw)}catch{return json({error:'Contexto inválido.'},400)}
-  if(!context||Array.isArray(context)||context.provider!=='github-actions'||context.repository_id!=='1432658222'||context.repository!=='Rick2818/Fabrica-de-Agentes-IA'||typeof context.run_id!=='string'||!/^\d{1,30}$/.test(context.run_id)||typeof context.run_attempt!=='string'||!/^\d{1,5}$/.test(context.run_attempt)||!['schedule','workflow_dispatch'].includes(context.event)||typeof context.commit_sha!=='string'||!/^[a-f0-9]{40}$/.test(context.commit_sha))return json({error:'Contexto de ejecución no permitido.'},400);
-  context=Object.fromEntries(['provider','repository_id','repository','run_id','run_attempt','event','commit_sha'].map(key=>[key,context[key]]));
+  if(supabase){
+   if(!context||Array.isArray(context)||context.provider!=='supabase-cron'||context.project_id!=='udispwzwrebjkanudcoy'||context.schedule_id!=='supabase:udispwzwrebjkanudcoy:fabrica-queue'||context.event!=='schedule'||typeof context.run_id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(context.run_id)||!Number.isSafeInteger(context.scheduled_at)||Math.abs(Date.now()-context.scheduled_at)>300000)return json({error:'Contexto de Supabase no permitido.'},400);
+   context=Object.fromEntries(['provider','project_id','schedule_id','event','run_id','scheduled_at'].map(key=>[key,context[key]]));
+   const cached=await trainingGet(env.DB,'supabase_cycle_receipt:'+context.run_id);
+   if(cached){if(JSON.stringify(cached.receipt.supabase)!==JSON.stringify(context))return json({error:'El identificador del ciclo ya tiene otro contexto.'},409);return json(cached);}
+  }else{
+   if(!context||Array.isArray(context)||context.provider!=='github-actions'||context.repository_id!=='1432658222'||context.repository!=='Rick2818/Fabrica-de-Agentes-IA'||typeof context.run_id!=='string'||!/^\d{1,30}$/.test(context.run_id)||typeof context.run_attempt!=='string'||!/^\d{1,5}$/.test(context.run_attempt)||!['schedule','workflow_dispatch'].includes(context.event)||typeof context.commit_sha!=='string'||!/^[a-f0-9]{40}$/.test(context.commit_sha))return json({error:'Contexto de ejecución no permitido.'},400);
+   context=Object.fromEntries(['provider','repository_id','repository','run_id','run_attempt','event','commit_sha'].map(key=>[key,context[key]]));
+  }
  }
  const started_at=Date.now();
  const pauseSetting=await first(env.DB,"SELECT value FROM settings WHERE key='automation'");let servicePaused=false;try{servicePaused=JSON.parse(pauseSetting?.value||'null')?.enabled===false}catch{}
- const run=context?await runRecordedCycle(env.DB,{...env,RUN_SOURCE:'github-actions'},{trigger:'scheduled',cycle_id:context.run_id+'-'+context.run_attempt,schedule_id:'github:'+context.repository_id}):servicePaused?{status:'paused'}:await runNext(env.DB,{...env,RUN_SOURCE:'service-runner'});
+ const run=context?supabase?await runRecordedCycle(env.DB,{...env,RUN_SOURCE:'supabase-cron'},{trigger:'scheduled',cycle_id:context.run_id,schedule_id:context.schedule_id}):await runRecordedCycle(env.DB,{...env,RUN_SOURCE:'github-actions',GITHUB_AUTOMATIC:context.event==='schedule'&&context.run_attempt==='1'},{trigger:'scheduled',cycle_id:context.run_id+'-'+context.run_attempt,schedule_id:'github:'+context.repository_id}):servicePaused?{status:'paused'}:await runNext(env.DB,{...env,RUN_SOURCE:supabase?'supabase-service':'service-runner'});
  const pending=await first(env.DB,"SELECT count(*) AS n,MIN(CASE WHEN status='running' THEN lease_until ELSE next_attempt_at END) AS next_at FROM jobs WHERE status IN ('queued','waiting','running')");
  await syncNotifications(env.DB);
- const receipt={started_at,completed_at:Date.now(),source:context?'github-actions':'service-runner',status:run.status,job_id:run.id||null,pending:pending.n,next_at:Math.max(run.next_at||0,pending.next_at||0)||null,...(context?{github:context}:{})};
- await stmt(env.DB,"INSERT INTO settings(key,value) VALUES('cloud_runner_receipt',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify(receipt)).run();
+ const receipt={started_at,completed_at:Date.now(),source:context?(supabase?'supabase-cron':'github-actions'):supabase?'supabase-service':'service-runner',status:run.status,job_id:run.id||null,pending:pending.n,next_at:Math.max(run.next_at||0,pending.next_at||0)||null,...(context?(supabase?{supabase:context}:{github:context}):{})};
+ // A manual credential check must not replace the principal GitHub receipt.
+ if(supabase){await trainingSet(env.DB,context?'supabase_runner_receipt':'supabase_service_receipt',receipt);if(context){await trainingSet(env.DB,'supabase_cycle_receipt:'+context.run_id,{run,receipt});await stmt(env.DB,"DELETE FROM settings WHERE key LIKE 'supabase_cycle_receipt:%' AND json_extract(value,'$.receipt.completed_at')<?",Date.now()-3600000).run();}}
+ else await stmt(env.DB,"INSERT INTO settings(key,value) VALUES('cloud_runner_receipt',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify(receipt)).run();
  return json({run,receipt});
 }
 
@@ -529,6 +568,7 @@ async function runSpecialistTool(db,a){
 export default {async fetch(request,env,ctx){
  const url=new URL(request.url);
  try{
+  if(url.pathname==='/internal/factory/orders'||url.pathname.startsWith('/api/factory/'))return await factoryRoute(request,env);
   if(url.pathname==='/internal/runner')return await cloudRunner(request,env);
   if(url.pathname==='/mcp'&&request.method==='POST')return await mcp(request,env);
   if(url.pathname.startsWith('/api/')){
@@ -536,6 +576,7 @@ export default {async fetch(request,env,ctx){
    if(!env.DB)return json({error:'El almacenamiento todavía no está disponible.'},503);
    if(!['GET','HEAD'].includes(request.method)&&request.headers.get('origin')!==url.origin)return json({error:'Origen no permitido.'},403);
    if(url.pathname==='/api/agents/leo/crm')return await leoCRM(request,env);
+   if(url.pathname.startsWith('/api/integrations/google/'))return await googleConnection(request,env);
    if(url.pathname==='/api/opportunities'&&request.method==='GET')return json(await commercialBoard(env.DB));
    if(url.pathname==='/api/expression/skills'&&request.method==='GET')return json({skills:EXPRESSION_SKILLS});
    if(url.pathname==='/api/expression/score'&&request.method==='POST')return json(await saveExpression(env.DB,await parse(request)));
@@ -687,5 +728,5 @@ export default {async fetch(request,env,ctx){
   const asset=url.pathname==='/'?'index.html':url.pathname.slice(1);
   if(!Object.hasOwn(assets,asset))return new Response('No encontrado',{status:404});
   return new Response(assets[asset],{headers:{'content-type':asset.endsWith('.css')?'text/css':asset.endsWith('.js')?'text/javascript':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'same-origin','content-security-policy':"default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; media-src 'self' blob: data:; worker-src 'self' blob:; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://huggingface.co https://*.huggingface.co https://*.hf.co; base-uri 'none'; object-src 'none'"}});
- }catch(e){return json({error:e.status?e.message:'No pude completar la operación. Tus datos guardados se conservan.'},e.status||500);}
+ }catch(e){return json({error:e.status?e.message:'No pude completar la operación. Tus datos guardados se conservan.',...(e.public_diagnostics?{diagnostics:e.public_diagnostics}:{})},e.status||500);}
 }};
