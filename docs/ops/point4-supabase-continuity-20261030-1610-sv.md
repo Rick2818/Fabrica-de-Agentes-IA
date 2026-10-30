@@ -1,0 +1,26 @@
+# Fábrica de Agentes IA — Punto 4 — control de continuidad (solo lectura)
+**Corte:** 2026-10-30, aprox. 16:10 America/El_Salvador (22:10 UTC). Datos de cron y recibos hasta 22:09 UTC.
+**Estado rector:** CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN. Sin cliente real no se reabre cierre ni se certifica. No confundir con estación 4 ni GitHub issue #4.
+
+## Evidencia comprobada
+- **Principal Supabase Cron:** proyecto `udispwzwrebjkanudcoy`, `cron.job` `jobid=1`, `fabrica-queue`, `* * * * *`, `active=true`, comando `select private.fabrica_scheduler_tick();`. Configuración `enabled=true`, `not_before=NULL`, `last_error=NULL`. Sin ejecución manual del tick.
+- **Ejecuciones SQL:** `cron.job_run_details` registra 3,052 `succeeded` (última 2026-10-30 22:09:00 UTC), +59 desde el corte de las 15:10. `succeeded` acredita SQL, no una entrega funcional `done`.
+- **Recibos SQL:** 2,314 filas, 2,314 UUID `cycle_id` únicos y 2,314 `request_id` únicos; 2,309 `verified=true`; nueve `verified AND site_status='done'` históricos, cero `done` nuevos en las últimas 24 horas. Distribución: 2,292 `idle` verificados, 9 `done`, 4 `waiting`, 2 `error`, 1 `busy`, 1 `quota`, 4 `network_error` sin verificar y 1 último recibo aún sin conciliar. Cuatro sin verificar con más de dos minutos, correspondientes a los cuatro incidentes históricos de transporte. No se registraron errores de transporte nuevos.
+- **Conciliación UUID:** `5fdbe688-7c48-4e13-9926-5fd2e3ab92a2` (22:08 UTC) está `verified=true`, HTTP200 y `site_status=idle` en SQL y corresponde al ciclo `idle` del Site. `a7665c69-d3ab-4ddc-ab3d-7b01cc657ed2` (22:09 UTC) coincide con el último ciclo `idle` del Site pero tenía `checked_at=NULL`, `verified=false` en SQL al corte. Ninguno representa una entrega `done`.
+- **Site vía complemento nativo Fábrica:** 65 trabajos: 60 `done`, 2 `failed`, 3 `cancelled`, cero pendientes; sin leases ni reintentos pendientes en la cola visible. `health.supabase_runner.status=idle`, `health.autonomy.status=recent`, `automation.enabled=true`, `usage=0/20`, `next_run_at=NULL`. No se ejecutó trabajo ni prueba sintética nueva.
+- **Respaldo horario:** `Respaldo de pendientes Fábrica IA` (`6adbf94d28e8819189c0516c6068457a`) habilitado; última ejecución registrada `1e426ae1-3748-8331-8e53-f61d8cb7d282`, `no_update`, 21:57:45–21:57:46 UTC. Sin resultado de procesamiento atribuido a ese ciclo. No se creó ejecutor competidor.
+- **GitHub:** `AGENTS.md` leído. Siete YAML en `main` revisados: `agent-runner.yml`, `diagnostic-a-scheduler.yml`, `diagnostic-b-conditions.yml`, `diagnostic-c-actor.yml`, `factory-regression.yml`, `training-regression.yml`, `verify-training.yml`; ninguno incluye `on.schedule`. `agent-runner.yml` solo manual; otras pruebas pueden disparar por push/PR o manual.
+- **Integridad:** índices únicos `fabrica_scheduler_receipts_pkey(cycle_id)` y `fabrica_scheduler_receipts_request_id_key(request_id)`. Hash de `private.fabrica_scheduler_tick`: `7fb25848caa91dc78eb0f469659f691d`; hash de `private.fabrica_scheduler_reconcile`: `78a1057460b103ae1cddfb5d5e0339f0`, sin cambio respecto al control anterior. Inspección estática: `tick` incluye `pg_try_advisory_xact_lock`, `not_before`, `request_id`; `reconcile` incluye `not_before`, `request_id`, `network_error`. No sustituye prueba dinámica.
+- **Logs:** consulta unificada 21:00–22:10 UTC: 169 `postgres_logs`, 3 `pgbouncer_logs`; sin `function_edge_logs` ni trazas internas de Site en el resumen. La causa de los cuatro errores de transporte sigue sin demostrarse.
+- **Modelos:** resultados sintéticos históricos sin repetir: primario `gemini-2.5-flash` HTTP404, respaldo `gemini-2.5-flash-lite` HTTP404, tercero `gemini-3.5-flash-lite` HTTP200. No equivale a fallback E2E certificado.
+- **Fuente Site:** se conserva antecedente rector de fuente nativa original v53 y 122 pruebas de servidor previamente aprobadas en worktree; v54 guardada sin desplegar. En este control no se pudo inspeccionar el código desplegado mediante Sites nativo. El navegador conectado exige contexto de origen y no estuvo disponible; esto no demuestra imposibilidad de inspeccionar fuente con Sites. Una consulta del SHA `5be977154cc15c9511787d22e28b7367e6f00467` contra el repositorio GitHub devolvió 422 (commit no localizado allí); no invalida su posible procedencia de Sites ni demuestra identidad con el despliegue vigente.
+
+## Pendientes, NO aprobados
+1. Diagnóstico causal de cuatro `network_error` con trazas internas del Site.
+2. Pruebas dinámicas aisladas de concurrencia, locks, idempotencia, pausas, reintentos, recuperación y respeto de `not_before`.
+3. Prueba sintética E2E con `done` y recibos de Site/Supabase correlacionados por UUID; no confundir con aceptación de cliente.
+4. Fallback E2E verificando modelo efectivo de respuesta.
+5. Comparación nativa del código del Site actualmente desplegado con la fuente original v53; no activar v54.
+6. Aceptación final con cliente real cuando exista.
+
+**Intervención:** solo lectura en Supabase, complemento Fábrica, GitHub y estado de Automations; más este documento durable. Sin SQL de escritura, cambios de código operativo, cron manual, nuevos ejecutores, cuota/fechas, despliegues, correos, pagos ni terceros. No se demostró una regresión nueva. **Punto 4: CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN.**
