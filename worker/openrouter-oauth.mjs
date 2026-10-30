@@ -10,7 +10,7 @@ export function makeVerifier(cryptoAPI=crypto){
 export async function makeChallenge(verifier,cryptoAPI=crypto){
  if(!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier))throw Error('Invalid PKCE verifier');
  const bytes=new Uint8Array(await cryptoAPI.subtle.digest('SHA-256',enc.encode(verifier)));
- return btoa(String.fromCharCode(...bytes)).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
+ return btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');
 }
 export async function startOpenRouterOAuth({callbackUrl,cryptoAPI=crypto}){
  const url=new URL(callbackUrl);
