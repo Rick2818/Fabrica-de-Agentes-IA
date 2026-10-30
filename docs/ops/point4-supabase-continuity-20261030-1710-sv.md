@@ -1,0 +1,25 @@
+# Fábrica de Agentes IA — Punto 4 — auditoría de continuidad (solo lectura)
+**Corte coherente:** 2026-10-30 17:09 America/El_Salvador (23:09 UTC). Algunas consultas de configuración se completaron a las 17:10. **Estado rector: CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN.** Este punto no es la estación 4 del diseño ni GitHub issue #4.
+
+## Evidencia directa
+- **Supabase Cron principal** en proyecto `udispwzwrebjkanudcoy`: único `cron.job` con `jobid=1`, `jobname=fabrica-queue`, `schedule=* * * * *`, `active=true`, comando `select private.fabrica_scheduler_tick();`. Configuración `private.fabrica_scheduler_config`: `enabled=true`, `not_before=NULL`, `last_error=NULL`. No se ejecutó manualmente el tick.
+- **Cron SQL:** 3,112 registros `succeeded` hasta 23:09 UTC, 0 fallidos. +60 frente a control 16:10 SV. El éxito SQL no acredita trabajo `done`.
+- **Recibos SQL:** 2,374 filas, 2,374 `cycle_id` únicos y 2,374 `request_id` únicos; 2,369 `verified=true`, cinco sin verificar (cuatro `network_error` históricos y último en conciliación). +60 filas y +60 verificados frente al control anterior. Distribución: 2,352 `idle` verificados, 9 `done` históricos, 4 `waiting`, 2 `error`, 1 `quota`, 1 `busy`, 4 `network_error` no verificados y 1 reciente no conciliado. Cuatro recibos no verificados con más de dos minutos, todos errores históricos; ninguno nuevo en la última hora.
+- **Conciliación específica:** ciclo `ce5d5ec8-b182-43dd-849c-187d5145460e` programado 23:08 UTC: `request_id=2374`, HTTP200, `verified=true`, `site_status=idle` en SQL; UUID coincide con `health.autonomy.primary.last_cycle` del Site en la lectura de ese minuto. Ciclo 23:09 UTC `59dc95b4-871f-4fe2-9487-5dfb0f18736c`, `request_id=2375`, `idle` en Site, aún sin conciliación SQL al corte. No contarlos como entregas.
+- **Site mediante complemento Fábrica:** 65 trabajos, 60 `done`, 2 `failed`, 3 `cancelled`, 0 pendientes. Sin leases activos ni reintentos pendientes en cola visible. `automation.enabled=true`, `usage=0/20`, `health.supabase_runner.status=idle`, `health.autonomy.primary.recent=true`, `next_run_at=NULL`. No se crearon encargos ni se ejecutaron pruebas nuevas.
+- **Respaldo:** `Respaldo de pendientes Fábrica IA` `6adbf94d28e8819189c0516c6068457a` sigue habilitado; última ejecución registrada `eec58929-2bd0-8328-8256-34a688f13774`, `no_update`, 22:24:01–22:24:02 UTC. Sin resultado `done` atribuible a ese ciclo; no se invocó respaldo.
+- **GitHub:** se leyó `AGENTS.md`. Se inspeccionaron los siete YAML en `main`: `agent-runner.yml`, `diagnostic-a-scheduler.yml`, `diagnostic-b-conditions.yml`, `diagnostic-c-actor.yml`, `factory-regression.yml`, `training-regression.yml`, `verify-training.yml`. Ninguno contiene `on.schedule`; el runner es manual. Los demás pueden activarse por `push` o `pull_request` y manualmente; esto no demuestra schedule.
+- **Integridad:** índices únicos `fabrica_scheduler_receipts_pkey(cycle_id)` y `fabrica_scheduler_receipts_request_id_key(request_id)` presentes. Hash MD5 de definición SQL `private.fabrica_scheduler_tick` = `7fb25848caa91dc78eb0f469659f691d`; `private.fabrica_scheduler_reconcile` = `78a1057460b103ae1cddfb5d5e0339f0`, iguales a control anterior. Esto es prueba estática, no prueba dinámica de concurrencia.
+- **Logs:** en 22:00–23:10 UTC se observaron 169 entradas `postgres_logs` y 3 `pgbouncer_logs`; las últimas muestran inicio y fin de cron con `1 row`. No se recuperaron trazas internas de Site que expliquen los cuatro `network_error` históricos.
+- **Fallback:** checks sintéticos históricos del Site: `gemini-2.5-flash` HTTP404; `gemini-2.5-flash-lite` HTTP404; `gemini-3.5-flash-lite` HTTP200. No se repitieron y no demuestran fallback E2E. Mantener brecha.
+- **Fuente Site:** consta antecedente de fuente nativa v53 recuperada (commit `5be977154cc15c9511787d22e28b7367e6f00467`) y 122 pruebas de servidor sobre worktree. Esta auditoría no obtuvo una comparación nativa del código efectivamente desplegado. No interpretar la ausencia de navegador como imposibilidad de acceder a fuente por Sites. v54 permanece guardada sin desplegar.
+
+## Pendientes NO aprobados
+1. Causa raíz de los cuatro `network_error` históricos mediante trazas de transporte/Site.
+2. Pruebas dinámicas seguras y aisladas de locks, concurrencia, reintentos, idempotencia, pausa y recuperación, incluyendo respeto a `not_before`.
+3. Prueba sintética E2E de ejecución `done` con recibo Site y SQL correlacionados por UUID, sin crear entregas artificiales ni afectar cuota.
+4. Fallback real E2E con evidencia del modelo efectivo.
+5. Comparación de fuente nativa desplegada con v53, sin activar v54.
+6. Aceptación final con cliente real, pendiente por inexistencia de cliente; no reabre cierre administrativo.
+
+**Intervención:** lectura de GitHub, Supabase, complemento Fábrica y estado del respaldo, más este documento. Sin cambios operativos, sin segundo ejecutor, sin tick manual, sin cambio de cuota/fechas, sin despliegues, sin envíos ni pagos. **CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN.**
