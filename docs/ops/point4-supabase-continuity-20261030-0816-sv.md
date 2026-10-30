@@ -1,0 +1,27 @@
+# Fábrica de Agentes IA — Punto 4: control de continuidad (2026-10-30, 08:16 El Salvador)
+
+**Estado rector:** CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN. No hay cliente real para la aceptación final. Auditoría de lectura y documentación: no se ejecutó el tick, no se cambió producción ni se consumió cuota.
+
+## Evidencia observada en este control
+
+- **Fuentes:** Supabase proyecto `udispwzwrebjkanudcoy` (cron.job, cron.job_run_details, private.fabrica_scheduler_receipts, private.fabrica_scheduler_config, definición de funciones, índices y logs unificados); complemento nativo Fábrica `agent_status`; GitHub `Rick2818/Fabrica-de-Agentes-IA` (AGENTS.md, siete workflows de main); `Automations.peek` del respaldo. No hubo acceso nativo directo al código/despliegue del Site en este control.
+- **Cron:** proyecto Supabase `ACTIVE_HEALTHY`. Job 1 `fabrica-queue`, único job en `cron.job`, activo, `* * * * *`. Al corte 2026-10-30 14:15:14 UTC: **2,578 ejecuciones SQL succeeded, cero con otro estado**, +66 respecto al control 07:10 SV. El mensaje SQL `1 row` no demuestra entrega de tareas.
+- **Recibos:** corte 14:15:21 UTC: **1,840 recibos y 1,840 UUID únicos; 1,835 verificados, cinco sin verificar**. De estos, cuatro son `network_error` históricos y uno corresponde al ciclo 14:15 aún en conciliación. Cero incidentes de transporte nuevos. En lectura posterior 14:16:05 UTC se verificó específicamente el UUID `c5dd30d6-75de-4d42-852d-f5a860f77ec6`: `verified=true`, HTTP 200, `site_status=idle`, `error_code=null`, conciliado 14:16:00 UTC. Este UUID coincide con `health.autonomy.last_scheduled_cycle` y `health.supabase_runner` del Site; **no es una entrega done**.
+- **Distribución de recibos verificados al primer corte:** 1,818 `idle`, **9 `done` históricos** (último 2026-10-29 07:27 UTC), 4 `waiting`, 2 `error`, 1 `busy`, 1 `quota`. Ninguna entrega funcional nueva desde el control anterior. Los cuatro recibos de transporte sin verificación tienen `error_code=network_error` y no se les atribuye resultado del Site.
+- **Site / cola:** `agent_status` informa 65 trabajos: 60 `done` históricos, 2 `failed`, 3 `cancelled`, **0 pendientes**. Cuota **0/20**. `health.autonomy.primary.recent=true`, ciclo `idle` con fuente `supabase-cron` y UUID correlacionado. Los 60 trabajos done del Site son distintos de los nueve recibos cron done. `health.autonomy.backup.recent=false`: no prueba falla del respaldo; su automatización es independiente y no tuvo trabajo que procesar.
+- **Configuración y exclusión mutua:** `enabled=true`, `not_before=null`, `last_error=null`. `fabrica_scheduler_tick` conserva hash `7fb25848caa91dc78eb0f469659f691d` y `fabrica_scheduler_reconcile` hash `78a1057460b103ae1cddfb5d5e0339f0`. Inspección de definición: `pg_try_advisory_xact_lock`, `FOR UPDATE`, espera de recibo, `not_before`, pausa ante error y conciliación. Índices únicos sobre `cycle_id` y `request_id` presentes. **No son pruebas dinámicas de concurrencia, reintentos o idempotencia.** No se alteraron fechas, cuotas ni locks.
+- **GitHub:** AGENTS.md leído. Los siete workflows leídos individualmente: `agent-runner.yml`, `diagnostic-a-scheduler.yml`, `diagnostic-b-conditions.yml`, `diagnostic-c-actor.yml`, `factory-regression.yml`, `training-regression.yml`, `verify-training.yml`. Ninguno contiene disparador `schedule`; runner manual `workflow_dispatch`, otros disparadores `push`/`pull_request` son pruebas CI y no el cron principal. No se ejecutó ningún workflow.
+- **Respaldo:** automatización `Respaldo de pendientes Fábrica IA` habilitada, último run registrado 2026-10-30 13:45:25 UTC, estado `no_update`. No acredita entrega funcional; no se invocó ni reconfiguró.
+- **Logs:** ventana 13:00–14:15 UTC, 180 `postgres_logs`, tres `pgbouncer_logs`. Los eventos visibles muestran inicio/fin de `cron job 1`; no contienen trazas internas del Site que permitan determinar la causa de los cuatro timeouts.
+- **Modelos:** el Site conserva resultados sintéticos previos: primario `gemini-2.5-flash` HTTP404, respaldo `gemini-2.5-flash-lite` HTTP404, tercero `gemini-3.5-flash-lite` HTTP200. La respuesta del tercero es prueba aislada de conexión, **no certificación de fallback E2E**.
+- **Versiones:** la fuente nativa asociada a v53 se había recuperado con identificador de commit Site `5be977154cc15c9511787d22e28b7367e6f00467` y 122 pruebas históricas de servidor. Ese identificador no se pudo resolver como commit en GitHub, lo que no invalida su procedencia del Site. No hubo acceso directo a la versión desplegada para contrastar. La v54 permanece guardada sin desplegar; no se activó.
+
+## Pendientes reales y límites
+
+1. Diagnóstico causal de los cuatro `network_error` usando trazas nativas del Site y UUID originales, sin atribuir `done` por SQL/HTTP.
+2. Pruebas sintéticas **aisladas** de concurrencia, exclusión mutua, pausas, reintentos, idempotencia, recuperación y respeto a `not_before`; sin tocar la cola ni cuota reales.
+3. Prueba sintética E2E de una entrega con recibo `done` correlacionado y fallback efectivo; distinguirla de aceptación del cliente.
+4. Comparación de la fuente y versión realmente desplegadas mediante acceso nativo a Sites, preservando el Site y sus trabajos.
+5. Aceptación final por cliente real cuando exista.
+
+**Decisión:** no se observó regresión nueva ni bloqueo que justifique un cambio de producción. No crear otro ejecutor ni otro disparador; conservar principal y respaldo. **Punto 4 CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN.**
