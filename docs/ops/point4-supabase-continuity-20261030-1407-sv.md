@@ -1,0 +1,26 @@
+# Fábrica de Agentes IA — Punto 4 — control de continuidad (solo lectura)
+**Corte:** 2026-10-30 14:07:51 America/El_Salvador (20:07:51 UTC).  
+**Estado rector:** CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN. Sin cliente real para aceptación final. No confundir con estación visual 4 ni issue #4.
+
+## Comprobaciones directas de este control
+- **Supabase:** proyecto `udispwzwrebjkanudcoy` ACTIVE_HEALTHY. `cron.job` tiene un único job principal consultado: jobid 1, `fabrica-queue`, `* * * * *`, `active=true`, comando `select private.fabrica_scheduler_tick();`. `private.fabrica_scheduler_config`: `enabled=true`, `not_before=NULL`, `last_error=NULL`. No se invocó tick ni se modificó configuración.
+- **Cron SQL:** a las 20:07:51 UTC, 2,930 `succeeded`; último `cron.job_run_details.start_time` 20:07:00.029957 UTC. 55 ejecuciones adicionales respecto al control de las 13:13. Un SQL `succeeded` no equivale a procesamiento `done`.
+- **Recibos Supabase:** 2,192 filas y UUID únicos, 2,187 `verified=true`, nueve `verified AND site_status='done'` históricos, 2,170 `idle`, cuatro `waiting`, dos `error`, uno `quota`, uno `busy`. Cuatro `network_error` históricos no verificados y un recibo reciente pendiente de conciliación; cinco no verificados en total. Los cuatro no verificados de más de dos minutos son precisamente los cuatro errores de transporte (00:38, 03:53, 05:17 y 05:54 UTC). Ninguno nuevo. 60 recibos en la última hora; cero duplicados de UUID y request_id. Último recibo programado 20:07:00.041 UTC.
+- **Conciliación UUID:** `218303fb-daa4-4721-a33e-6536153673c7` (20:06) aparece en SQL como `verified=true`, HTTP 200, `site_status=idle` y en el Site como ciclo `idle`. `b96c6e3e-9fde-4bfb-afce-fdeccc5cb09b` (20:07) figura en `health.supabase_runner` y `health.autonomy.primary` como `idle`; su recibo SQL estaba pendiente en la primera lectura. No contar `idle` como `done`.
+- **Integridad SQL:** índices únicos `fabrica_scheduler_receipts_pkey(cycle_id)` y `fabrica_scheduler_receipts_request_id_key(request_id)`. Hash de `private.fabrica_scheduler_tick`: `7fb25848caa91dc78eb0f469659f691d`; de `private.fabrica_scheduler_reconcile`: `78a1057460b103ae1cddfb5d5e0339f0`, sin cambios respecto al control previo. La función tick contiene `pg_try_advisory_xact_lock` y `not_before`. Verificación estática, no prueba dinámica de concurrencia, locks, reintentos o idempotencia.
+- **Site vía complemento nativo de Fábrica:** 65 trabajos: 60 `done`, dos `failed`, tres `cancelled`; cero pendientes, leases activos o reintentos vencidos. `health.supabase_runner.status=idle`, `health.autonomy.status=recent`, `automation.enabled=true`, cuota 0/20, `next_run_at=NULL`. No se creó ni ejecutó trabajo. No se inspeccionó el código del Site mediante acceso nativo de Sites en este control.
+- **Respaldo horario:** `Respaldo de pendientes Fábrica IA` (`6adbf94d28e8819189c0516c6068457a`) habilitado. Último run `f2ef871a-23b8-8322-9b0e-6bd202557ee4`, `no_update`, 19:09:50–19:09:51 UTC, `latest_result=null`. No inferir procesamiento de cola a partir del estado de la automatización.
+- **GitHub:** `AGENTS.md` leído; siete workflows de `main` inspeccionados individualmente: `agent-runner.yml`, `diagnostic-a-scheduler.yml`, `diagnostic-b-conditions.yml`, `diagnostic-c-actor.yml`, `factory-regression.yml`, `training-regression.yml`, `verify-training.yml`. Cero disparadores `schedule`; solo `workflow_dispatch`, `push` o `pull_request` según archivo.
+- **Logs:** consulta Supabase 19:05–20:05 UTC: 142 `postgres_logs` y tres `pgbouncer_logs`; sin `function_edge_logs` ni trazas internas de Site en ese resumen. No se identificó la causa raíz de los cuatro timeouts históricos.
+- **Modelos:** evidencia sintética previa en `health.model_checks`: `gemini-2.5-flash` primario HTTP404; `gemini-2.5-flash-lite` respaldo HTTP404; `gemini-3.5-flash-lite` tercero HTTP200 con `CONEXION_OK`. No se ejecutaron pruebas nuevas; el HTTP200 aislado no demuestra fallback E2E.
+- **Fuente Site:** antecedente rector v53, commit `5be977154cc15c9511787d22e28b7367e6f00467`, 122 pruebas de servidor históricamente aprobadas. No se hizo comparación nueva con despliegue Site vigente; v54 sigue guardada sin desplegar y no fue activada.
+
+## Pendientes sin aprobar
+1. Obtener trazas internas del Site y diagnóstico causal de los cuatro timeouts de transporte.
+2. Pruebas dinámicas aisladas de locks, concurrencia, idempotencia, pausas, reintentos, recuperación y respeto de `not_before`.
+3. E2E sintético de un trabajo efectivamente `done` correlacionando recibo Site, UUID y recibo SQL, separado de aceptación del cliente.
+4. E2E del fallback y prueba de modelo realmente ejecutado en respuesta final.
+5. Comparación nativa de fuente del Site v53 con el despliegue vigente, sin sustituir fuente ni activar v54.
+6. Aceptación final con cliente real cuando exista.
+
+**Intervención:** exclusivamente lecturas de Supabase, GitHub, complemento Fábrica y Automations, más este documento durable en GitHub. Sin SQL de escritura, tick manual, nuevos ejecutores, cambio de cuota, fechas, permisos, código de producción, versiones, clientes, pagos ni envíos. Sin regresión nueva comprobada. **Punto 4 permanece CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN.**
