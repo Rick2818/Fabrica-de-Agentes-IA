@@ -1,0 +1,34 @@
+# Punto 4 — auditoría de continuidad, 2026-10-31 09:08 SV
+
+## Estado rector
+**CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN.** Alcance exclusivo de Fábrica de Agentes IA, Site `appgprj_6adbf0c05a0c8191b2ca585b76f5e862`, repositorio `Rick2818/Fabrica-de-Agentes-IA`, Supabase `udispwzwrebjkanudcoy`. No reabrir por ausencia de cliente real. No confundir con estación 4 ni issue #4. Fuente Site original v53 recuperada históricamente (commit `5be977154cc15c9511787d22e28b7367e6f00467`, 122 pruebas de servidor históricas); v54 guardada no desplegada. Este control no despliega ni reemplaza ninguna versión.
+
+## Hallazgo nuevo: timeout de transporte con ejecución del Site posteriormente visible
+- **2026-10-31 14:57 UTC (08:57 SV):** `cycle_id=7a6ca346-b178-4869-baec-136c47c47bb8`, `request_id=3323`. Supabase `private.fabrica_scheduler_receipts`: `verified=false`, `http_status=NULL`, `site_status=NULL`, `error_code=network_error`; `checked_at=14:58 UTC`.
+- **Causa de la clasificación de transporte identificada directamente:** `net._http_response` fila 3323: `timed_out=true`, `status_code=NULL`, `error_msg='Timeout of 55000 ms reached. Total time: 55001.683000 ms ... HTTP Request/Response time: 55001.423000 ms'`. Es un **timeout de pg_net de 55 segundos**. No se ha demostrado la causa de la demora del extremo remoto (arranque, cola, conectividad, etc.).
+- **Contraste con el Site:** `agent_status.health.autonomy.cycles` conserva el **mismo UUID** y `source=supabase-cron`, `status=idle`, con `started_at=1793458692088` y `completed_at=1793458692578`. El Site registró ese ciclo, pero Supabase no recibió respuesta válida a tiempo; **no** se debe cambiar `verified=false` a verdadero ni llamar al ciclo `done`. `idle` no acredita trabajo entregado.
+- **Backoff confirmado en código SQL:** `private.fabrica_scheduler_reconcile()` impone `not_before=clock_timestamp()+interval '5 minutes'` cuando la respuesta no es válida. `private.fabrica_scheduler_tick()` respeta `not_before` y evita ticks competidores con `pg_try_advisory_xact_lock`. Hubo ejecuciones SQL cada minuto de 14:58 a 15:02 UTC, pero sin nuevos recibos HTTP; el envío se reanudó a las **15:03 UTC**. Ciclos 15:03, 15:04, 15:05 y 15:06 UTC conciliados `verified=true`, `http_status=200`, `site_status=idle`. **Recuperación de programación observada; no recuperación de una entrega.**
+- La incidencia eleva los `network_error` históricos de **4 a 5**. Los cuatro anteriores siguen sin causa raíz acreditada. No modificar timeout, cuota ni fechas sin ensayo aislado; no forzar reenvío de este ciclo `idle`.
+
+## Estado comprobado de la infraestructura
+- **Supabase Cron**: un solo job `fabrica-queue`, id 1, activo, expresión `* * * * *`, comando `select private.fabrica_scheduler_tick();`. Corte SQL **2026-10-31 15:07:57 UTC**: **4,070** ejecuciones `succeeded`, **3,327** recibos, **3,321** `verified=true`, **9** `site_status=done` históricos y **5** `network_error`. `succeeded` de SQL no equivale a `done` del Site. No hubo `done` nuevo en la última hora consultada.
+- Configuración actual: `enabled=true`, `not_before=NULL`, `last_error=NULL`. Cero `cycle_id` duplicados, cero `request_id` duplicados, cero recibos sin verificar y sin error con antigüedad superior a 3 minutos. Índices únicos sobre `cycle_id` y `request_id` presentes. Hashes de funciones sin cambios: `tick=7fb25848caa91dc78eb0f469659f691d`, `reconcile=78a1057460b103ae1cddfb5d5e0339f0`.
+- **Conciliación específica:** `d77bf4b4-6d19-4100-8e00-9946e8c93d60` (15:06 UTC): SQL `HTTP 200, verified=true, site_status=idle`, y UUID coincidente en el Site. El ciclo `4386e1bf-3565-484e-8d6c-1b1c9ec2c136` (15:07 UTC) aparece `idle` en Site; conciliación SQL aún pendiente al primer corte. No inferir `done`.
+- **Site (conector operativo `agent_status`):** 65 trabajos: **60 done, 2 failed históricos, 3 cancelled, 0 pendientes**; sin trabajos nuevos ni leases activos visibles. Cuota 0/20. `health.autonomy.primary.recent=true`; `supabase_runner.status=idle`, `pending=0`. Configuración declarada: primario `gemini-2.5-flash`, backup `gemini-2.5-flash-lite`, tercero `gemini-3.5-flash-lite`. Probes sintéticos históricos de primario/backup HTTP 404 y tercero HTTP 200; no se repitieron, ni prueban fallback universal.
+- **GitHub**: `AGENTS.md` y los siete workflows leídos en `main`. Ninguno tiene `on.schedule`; el runner es `workflow_dispatch` manual. Se conserva discrepancia de URL: `SITE_ORIGIN` manual y destino SQL usan `glassybell1025.chatgpt.site`, mientras metadatos históricos v58 mencionan `rick271711.chatgpt.site`. La ejecución real de Supabase y recibos del Site no sustituyen una comparación nativa del despliegue actual. No se usó runner manual.
+- **Respaldo horario** `6adbf94d28e8819189c0516c6068457a`: `Automations.peek` confirmó `is_enabled=true`, último registro `2026-10-31T14:38:25Z` `no_update`. No se lanzó ni modificó el respaldo.
+- **Logs:** ventana 13:00–15:06 UTC: 299 `postgres_logs` y 6 `pgbouncer_logs`; búsqueda textual `error|timeout|failed` en `event_message` de Postgres entre 14:45 y 15:07 UTC sin coincidencias. Esto no descarta fallos del Site ni de red; la evidencia concluyente del timeout es `net._http_response` 3323.
+
+## Variación respecto a control 08:16 SV
+- Cron `succeeded`: **4,018 → 4,070** (+52).
+- Recibos: **3,280 → 3,327** (+47); verificados **3,275 → 3,321** (+46).
+- Errores de transporte: **4 → 5** (+1, timeout 55 s comprobado); `done` históricos **9 → 9**; Site 60/2/3/0 sin cambio.
+- Programación recuperada automáticamente tras backoff; no se observó pérdida de trabajo ni entrega nueva. El origen de la latencia remota sigue pendiente.
+
+## Pendientes — NO certificados
+1. Comparar mediante acceso **nativo de Sites** el código y URL efectivamente desplegados, configuración de modelos, versión y fuente GitHub. Este control usó el conector operativo del Site, no acceso nativo a su fuente. No reemplazar código vigente ni activar v54.
+2. Pruebas **dinámicas aisladas** de concurrencia, locks, idempotencia, pausas, `not_before`, reintentos, recuperación persistente y fallback de modelos. Inspección estática y ciclos `idle` no sustituyen estas pruebas.
+3. Investigar latencia remota del timeout de 14:57 UTC y causa de los cuatro `network_error` anteriores. No alterar límites de red o disparadores en producción para simular éxito.
+4. E2E de autonomía con recibos operativos verificables para los seis agentes, separando pruebas sintéticas de fabricación/entrega; aceptación final con cliente real cuando exista.
+
+**Acción de este control:** lecturas directas de Supabase, Site, GitHub, logs y estado del respaldo; documentación durable solamente. Sin prueba sintética nueva, cambios de código, despliegues, correos, gastos, modificaciones de cuota/fechas, ticks manuales ni ejecutores adicionales. **Punto 4 cerrado provisionalmente, sin certificación.**
