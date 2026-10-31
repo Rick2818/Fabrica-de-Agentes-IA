@@ -30,3 +30,6 @@
 
 ## Cambios y alcance
 Solo se creó este documento de auditoría. **No se invocó** `fabrica_scheduler_tick()`, no se creó otro ejecutor, no se alteró cuota/`not_before`, no se contactó a terceros, no se enviaron correos ni se cambió código, Site, versiones o ejecutores. El principal y respaldo quedan habilitados.
+
+## Conciliación posterior al corte
+Consulta SQL posterior confirmó que el ciclo `0edc7d31-23ff-4890-b78b-aa01bd769e8f` (programado 21:11:00Z) quedó conciliado a `2026-10-31T21:12:00.04124Z`: HTTP 200, `verified=true`, `site_status=idle`, `error_code=null`. Esto resuelve **la conciliación puntual pendiente al corte**; no altera los totales del corte ni acredita una entrega nueva. No se ejecutó tick manual.
