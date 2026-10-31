@@ -32,3 +32,6 @@
 - No se enviaron correos, contactaron terceros, activaron pagos, modificaron producción, cuotas, fechas, ejecutores, versiones o trabajos. No se ejecutó ningún tick adicional ni se creó un segundo disparador.
 
 **Resultado:** no hay regresión nueva confirmada ni entrega funcional nueva. Conservar cierre provisional sin certificación.
+
+## Conciliación posterior al corte
+Consulta independiente a las 22:15:05 UTC: el ciclo `e9b19ec3-66b6-42d5-b50a-e9dd68a301b0` quedó finalmente `verified=true`, `site_status=idle`, sin `error_code`. El nuevo ciclo `01d5b053-07e3-452a-9c69-b7e566d6b2ec` acababa de programarse y seguía pendiente de conciliación normal. No hay entrega nueva. Esta nota posterior no altera las cifras del corte 22:14:44 UTC.
