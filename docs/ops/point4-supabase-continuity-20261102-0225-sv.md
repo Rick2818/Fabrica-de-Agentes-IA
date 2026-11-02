@@ -1,0 +1,29 @@
+# Fábrica de Agentes IA — Punto 4 — continuidad (2026-11-02 02:25 CST, UTC−06)
+
+## Estado rector
+**CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN.** Auditoría de solo lectura sobre Supabase, Site (conector `agent_status`), AGENTS.md, GitHub y programación de respaldo. Única escritura: este documento. No se invocó `run_pending_tasks`, `fabrica_scheduler_tick` ni ningún trabajo de la cola; no se cambiaron cuotas, fechas, `not_before`, versiones, modelos, permisos, cron, workflows, trabajos ajenos ni ejecutores. No se desplegó v54.
+
+## Evidencia y cotejo del corte
+- **Corte SQL:** `2026-11-02T08:25:27.540599Z` (02:25:27 CST). Proyecto Supabase `udispwzwrebjkanudcoy`.
+- `cron.job`: un único job, `jobid=1`, `fabrica-queue`, `* * * * *`, `active=true`, comando `select private.fabrica_scheduler_tick();`. `private.fabrica_scheduler_config`: `enabled=true`, `not_before=null`, `last_error=null`.
+- `cron.job_run_details`: **6,548** ejecuciones `succeeded`, cero fallidas en el histórico consultado; **90** ejecuciones en los últimos 90 minutos. Esto acredita ejecución SQL, no procesamiento `done`.
+- `private.fabrica_scheduler_receipts`: **5,805** recibos; **5,799** `verified=true`; seis no verificados (cinco `network_error` históricos y el ciclo más reciente aún sin conciliar al corte). Comparado con 01:37: +49 ejecuciones SQL, +49 recibos y +49 verificados; no aumentaron los cinco errores históricos.
+- Distribución verificada: `idle=5782`, `done=9`, `waiting=4`, `error=2`, `busy=1`, `quota=1`. Los nueve `done` son históricos, no nuevas entregas. Últimos 90 minutos: **89** `idle` verificados, **cero** `done` nuevos y **cero** `error_code` nuevos.
+- Índices únicos: `fabrica_scheduler_receipts_pkey(cycle_id)` y `fabrica_scheduler_receipts_request_id_key(request_id)`; cero UUID duplicados y cero request IDs duplicados. Cero recibos sin conciliación ni error con más de tres minutos.
+- Último ciclo SQL/Site conciliado: `37084db5-bef9-4dfe-8396-b2136e8bbcd5` (08:24Z), `http_status=200`, `verified=true`, `site_status=idle`. Ciclo `19088ccb-77c0-4296-8e20-4322d9cde30b` (08:25Z) figuraba `idle` en `health.supabase_runner` del Site, pero seguía sin `checked_at` en SQL al corte. **No se aprueba ni se declara conciliado**.
+- Conector Site: 65 trabajos, **60 done**, **2 failed** históricos, **3 cancelled**, **cero pendientes**; cuota **0/20**; `health.autonomy.primary.recent=true`, `health.autonomy.stalled=false`, `health.supabase_runner.status=idle`. Las seis prácticas sintéticas `synthetic-six-20261028-{leo,mila,vera,alma,nico,lia}` siguen `done` con evidencia de generación de texto, no de aprobación, fabricación, aprovisionamiento, entrega ni aceptación.
+- Modelos: el último `health.model_checks` sigue siendo histórico: `gemini-2.5-flash` y `gemini-2.5-flash-lite` HTTP 404, tercer modelo `gemini-3.5-flash-lite` HTTP 200 en prueba sintética. No se ejecutaron nuevas sondas ni se cambió el proveedor.
+- `AGENTS.md` leído en `main`: Leo Ventas, Mila Servicio al cliente, Vera Finanzas, Alma Química y farmacia, Nico Logística, Lía Mercadeo. Las etiquetas históricas contradictorias no se trataron como reasignación de especialidad.
+- GitHub: último commit anterior al presente documento `9063f6eab91d30570efee8c97b8b7ae5f3d0b4b7` solo añade auditoría documental. `.github/workflows/agent-runner.yml` leído en `main`: contiene `workflow_dispatch` y **no** `schedule`. La revisión integral de los siete workflows del control 01:37 registró cero `schedule`; no hubo commits posteriores antes de esta auditoría. No se ejecutó workflow.
+- Automatizaciones verificadas por listado: auditoría Punto 4 `6ae238f8b8a081918479f796f34da2b1` habilitada y respaldo `6adbf94d28e8819189c0516c6068457a` habilitado. No se alteraron.
+- Código SQL estático leído: `fabrica_scheduler_tick` usa `pg_try_advisory_xact_lock`, verifica `enabled`, `not_before`, recibos pendientes y credenciales; `fabrica_scheduler_reconcile` comprueba campos del recibo y correlación del UUID, aplica diferimiento por fallos y respeta `next_at`. La lectura de código no sustituye pruebas dinámicas de concurrencia, pausas, reintentos e idempotencia.
+- Logs Supabase entre `2026-11-02T07:00:00Z` y `08:25:00Z`: 207 `postgres_logs` y 6 `pgbouncer_logs`. Entre los PostgreSQL, 204 severidad `LOG` y **tres `ERROR`**. Se inspeccionaron: son tres consultas **SELECT de auditoría** del 02:35 CST (07:35Z) que referían la columna inexistente `created_at` de `private.fabrica_scheduler_receipts`, SQLSTATE `42703`; **no son fallos del ejecutor**. No ocultar los errores ni atribuirles una regresión del cron. No se identificaron errores de servidor de la cola en esta muestra.
+
+## Pendientes explícitos, sin aprobación automática
+1. Cotejar por interfaz nativa de Sites la versión **efectivamente desplegada** y su fuente; el conector `agent_status` no expone el número de versión. Fuente v53 recuperada en `5be977154cc15c9511787d22e28b7367e6f00467`, 122 pruebas de servidor aprobadas en worktree histórico; no inferir versión actual ni desplegar v54.
+2. Pruebas **dinámicas aisladas** (no en cola real) de locks, reintentos, idempotencia, pausas, recuperación, cuota y `not_before`: no realizadas en este corte.
+3. Diagnóstico y recuperación demostrada de los dos modelos Gemini HTTP 404, sin cambio de proveedor ni gasto no autorizado.
+4. Recibos E2E persistidos y correlacionados por pedido, identidad y UUID: aprobación, fabricación, aprovisionamiento y entrega. Las respuestas sintéticas no son aceptación del cliente.
+5. Validación final con cliente real cuando exista, sin reabrir por ello el cierre administrativo provisional.
+
+**Resultado:** el cron Supabase principal conserva continuidad de ciclos `idle` conciliados y cola vacía. No se observó regresión operativa nueva en el alcance verificado. **Punto 4 CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN.**
