@@ -1,0 +1,29 @@
+# Fábrica de Agentes IA — Punto 4 — auditoría de continuidad (2026-11-01 22:09 CST, UTC−06)
+
+## Estado rector y alcance
+**CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN**, según instrucción del 29-10-2026. Auditoría de solo lectura en Site (estado vía conector), Supabase y GitHub; única escritura: este informe documental. No se ejecutó `fabrica_scheduler_tick()`, no se procesó la cola manualmente, no se alteraron cuotas, fechas, trabajos, proveedores, versiones, Site ni ejecutores. No se activó v54. Proyecto Site `appgprj_6adbf0c05a0c8191b2ca585b76f5e862`; proyecto Supabase `udispwzwrebjkanudcoy`; repositorio `Rick2818/Fabrica-de-Agentes-IA`.
+
+## Fuentes consultadas y corte verificable
+- **Supabase project:** `ACTIVE_HEALTHY`. Hora de consulta SQL final: `2026-11-02T04:09:31Z` (22:09:31 CST).
+- **Único job cron identificado:** `cron.job`, `jobid=1`, `jobname=fabrica-queue`, `active=true`, `schedule=* * * * *`, comando `select private.fabrica_scheduler_tick();`. `private.fabrica_scheduler_config`: `enabled=true`, `not_before=null`, `last_error=null`.
+- **`cron.job_run_details`:** 6,292 filas `succeeded` para jobid=1; último inicio consultado `2026-11-02T04:09:00Z`. `succeeded` describe la invocación SQL, **no acredita `done`**.
+- **`private.fabrica_scheduler_receipts`:** 5,549 recibos; 5,543 `verified=true`; seis no verificados; cinco `network_error` históricos. UUID de ciclo únicos 5,549/5,549; request IDs únicos 5,549/5,549. No se encontraron recibos sin conciliación y sin código de error con antigüedad mayor a tres minutos. En 90 minutos: 89 `idle` verificados, cero `done` verificados.
+- **Estados de recibos verificados:** `idle=5,526`, `done=9`, `waiting=4`, `error=2`, `quota=1`, `busy=1`. Estados históricos, no entregas nuevas.
+- **Último ciclo conciliado al corte:** `b7c10b2c-d03a-4594-ae87-89ee8c78218f`, programado `2026-11-02T04:08:00.045Z`, HTTP 200, `verified=true`, `site_status=idle`. Conector nativo `agent_status` reporta el mismo UUID, `supabase-cron`, `idle` y `pending=0`: conciliación entre Site y SQL.
+- **Siguiente ciclo:** `776de04b-478d-4a02-8c87-2b40afe47512`, programado `2026-11-02T04:09:00.038Z`, `checked_at=null`, `verified=false` al corte. No se declaró aprobado ni fallido.
+- **Site por `agent_status`:** 65 trabajos: 60 `done`, dos `failed`, tres `cancelled`, cero pendientes; salud del ejecutor Supabase `idle` reciente. Seis prácticas sintéticas `synthetic-six-20261028-{leo,mila,vera,alma,nico,lia}` `done` con recibos de generación de texto; **no equivalen a aprobación, fabricación, entrega ni aceptación de cliente**. La cuota y los contadores de uso no se alteraron.
+- **Respaldo horario:** la automatización `Respaldo de pendientes Fábrica IA`, id `6adbf94d28e8819189c0516c6068457a`, figura `is_enabled=true`, última ejecución registrada `2026-11-02T03:05:19.536694Z`. No se ejecutó ni se modificó desde esta auditoría.
+- **GitHub:** los siete archivos `.github/workflows/*.yml` de `main` se descargaron y revisaron individualmente; ninguno contiene disparador `schedule:`. `agent-runner.yml` usa `workflow_dispatch`. Los otros disparadores presentes son `workflow_dispatch`, `push` y `pull_request`. No atribuir a GitHub las ejecuciones Supabase.
+- **AGENTS.md:** leído desde `main`: Alma = Química y farmacia; Lía = Mercadeo. El historial de algunos trabajos sintéticos presenta especialidades distintas; no reescribir recibos, verificar contra la fuente Site efectiva.
+- **Funciones SQL e índices:** se inspeccionó `pg_get_functiondef` de `private.fabrica_scheduler_tick` y `private.fabrica_scheduler_reconcile`: `pg_try_advisory_xact_lock`, `for update`, validación de proveedor/proyecto/schedule/UUID/marca temporal/estado, espera de respuesta pendiente, pausa temporal por error y respeto de `next_at` mediante `not_before`. Índices únicos para `cycle_id` y `request_id`. La inspección estática **no certifica** concurrencia, idempotencia ni recuperación dinámica.
+- **Logs Supabase:** ventana `2026-11-02T02:35:00Z`–`04:10:00Z`, 230 entradas `postgres_logs` y seis `pgbouncer_logs`; filtro textual `error/fatal` sobre `event_message` sin coincidencias. Cobertura limitada al campo y a las fuentes visibles.
+- **Modelos en Site:** `health.model_checks` conserva primario `gemini-2.5-flash` HTTP 404 `verified=false` y respaldo `gemini-2.5-flash-lite` HTTP 404 `verified=false`; tercero `gemini-3.5-flash-lite` HTTP 200 `verified=true` en prueba histórica sintética. Los recibos de generación con `gemini-3.6-flash` no prueban recuperación de los dos modelos fallidos.
+
+## Limitaciones y pendientes explícitos
+1. El conector nativo consultado permite leer el estado del Site, pero **no expone en esta sesión el identificador de versión efectivamente desplegada**. La fuente original asociada a v53 fue recuperada históricamente en commit `5be977154cc15c9511787d22e28b7367e6f00467`, con 122 pruebas de servidor aprobadas sobre un worktree; **no se repitieron** ni se comprobó aquí su paridad con el despliegue. v54 permanece sin activar.
+2. Pruebas dinámicas aisladas de locks, simultaneidad, reintentos, pausa, `not_before`, idempotencia y recuperación: **no ejecutadas** en esta revisión; no marcar aprobadas.
+3. Salud y recuperación del primario y respaldo Gemini (HTTP 404): **pendiente de demostración**.
+4. Recibos operativos E2E de aprobación, fabricación y entrega y recuperación por cada agente: **no demostrados**; seis ejercicios de texto no sustituyen estas pruebas.
+5. Aceptación con cliente real: **pendiente** por ausencia de cliente, sin reabrir el cierre administrativo.
+
+**Conclusión:** no hay evidencia de regresión reciente en el programador dentro de las fuentes y ventana examinadas. Cola vacía y `idle` verificado acreditan continuidad del ciclo de control, no autonomía funcional completa. Se preservaron los ejecutores y el Site. **Punto 4 sigue CERRADO PROVISIONALMENTE, SIN CERTIFICACIÓN.**
