@@ -38,3 +38,7 @@
 - No se encontró regresión operativa nueva en la evidencia revisada. No se aplicaron correcciones de producción, cambios de fuente ni activaciones.
 
 **Conclusión:** el punto 4 conserva cierre provisional **SIN CERTIFICACIÓN**; cron principal y respaldo preservados; nueva evidencia es observacional y no equivale a aceptación final.
+
+## Conciliación posterior al corte (evidencia adicional)
+
+Consulta independiente posterior: el ciclo `ff53eaf1-9f9a-4fd6-b882-038d813771ee` fue conciliado en `2026-11-02 20:07:00.031286+00` con HTTP 200, `verified=true`, `site_status=idle`, `error_code=null`. Al corte original estaba pendiente, por lo que la anotación histórica se mantiene correcta; la verificación posterior elimina esa incertidumbre puntual, pero **no** acredita un trabajo `done` ni entrega funcional.
